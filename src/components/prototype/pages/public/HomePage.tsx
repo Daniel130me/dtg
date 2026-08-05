@@ -60,11 +60,11 @@ export default function HomePage() {
     <main className='flex-1'>
       {/* Hero Section */}
       <section className='relative overflow-hidden'>
-        <div className='absolute inset-0 bg-gradient-to-br from-blue-950 via-blue-900 to-slate-950' />
+        <div className='absolute inset-0 bg-gradient-to-br from-[#0a1a3e] via-[#0f2847] to-[#162d50]' />
         <div className='absolute inset-0 opacity-10'>
-          <div className='absolute top-20 left-10 size-72 rounded-full bg-blue-400 blur-3xl' />
-          <div className='absolute bottom-10 right-20 size-96 rounded-full bg-blue-400 blur-3xl' />
-          <div className='absolute top-40 right-1/3 size-64 rounded-full bg-blue-300 blur-3xl' />
+          <div className='absolute top-20 left-10 size-72 rounded-full bg-[#3b82f6] blur-3xl' />
+          <div className='absolute bottom-10 right-20 size-96 rounded-full bg-[#3b82f6] blur-3xl' />
+          <div className='absolute top-40 right-1/3 size-64 rounded-full bg-[#60a5fa] blur-3xl' />
         </div>
         <div className='relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36'>
           <motion.div
@@ -73,22 +73,22 @@ export default function HomePage() {
             transition={{ duration: 0.6 }}
             className='max-w-3xl'
           >
-            <Badge className='bg-blue-500/20 text-blue-200 border-blue-500/30 mb-6 text-sm px-3 py-1'>
-              <Star className='size-3.5 mr-1.5 fill-blue-300 text-blue-300' />
+            <Badge className='bg-[#3b82f6]/20 text-[#93c5fd] border-[#3b82f6]/30 mb-6 text-sm px-3 py-1'>
+              <Star className='size-3.5 mr-1.5 fill-[#60a5fa] text-[#60a5fa]' />
               Trusted by {analyticsData.totalStudents.toLocaleString()}+ students
             </Badge>
             <h1 className='text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6'>
               Master In-Demand Skills{' '}
-              <span className='text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-cyan-300'>with DTG</span>
+              <span className='text-transparent bg-clip-text bg-gradient-to-r from-[#93c5fd] to-[#67e8f9]'>with DTG</span>
             </h1>
-            <p className='text-lg sm:text-xl text-blue-100/80 leading-relaxed mb-8 max-w-2xl'>
+            <p className='text-lg sm:text-xl text-[#bfdbfe]/80 leading-relaxed mb-8 max-w-2xl'>
               Build real-world projects, learn from industry experts, and accelerate your tech career with our comprehensive, hands-on courses.
             </p>
             <div className='flex flex-col sm:flex-row gap-3'>
-              <Button size='lg' className='bg-white text-blue-900 hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
+              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
                 Browse Courses <ArrowRight className='ml-1.5 size-4' />
               </Button>
-              <Button size='lg' variant='outline' className='border-blue-400/30 text-blue-200 hover:bg-blue-800/50 text-base px-8' onClick={() => navigate('about')}>
+              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8' onClick={() => navigate('about')}>
                 Learn More
               </Button>
             </div>
@@ -109,7 +109,7 @@ export default function HomePage() {
             ].map((stat) => (
               <div key={stat.label} className='text-center'>
                 <div className='text-2xl sm:text-3xl font-bold text-white'>{stat.value}</div>
-                <div className='text-sm text-blue-300/70 mt-1'>{stat.label}</div>
+                <div className='text-sm text-[#93c5fd]/70 mt-1'>{stat.label}</div>
               </div>
             ))}
           </motion.div>
@@ -215,7 +215,7 @@ export default function HomePage() {
           >
             <div className='flex justify-center lg:justify-start'>
               <div className='relative'>
-                <div className='w-64 h-64 sm:w-80 sm:h-80 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center'>
+                <div className='w-64 h-64 sm:w-80 sm:h-80 rounded-2xl bg-gradient-to-br from-[#1d4ed8] to-[#0a1a3e] flex items-center justify-center'>
                   <span className='text-6xl sm:text-7xl font-bold text-white/90'>DG</span>
                 </div>
                 <div className='absolute -bottom-4 -right-4 bg-card border rounded-xl p-4 shadow-lg'>
@@ -348,10 +348,10 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className='py-16 sm:py-20 bg-gradient-to-br from-blue-950 via-blue-900 to-slate-950 relative overflow-hidden'>
+      <section className='py-16 sm:py-20 bg-gradient-to-br from-[#0a1a3e] via-[#0f2847] to-[#162d50] relative overflow-hidden'>
         <div className='absolute inset-0 opacity-10'>
-          <div className='absolute top-10 right-10 size-64 rounded-full bg-blue-400 blur-3xl' />
-          <div className='absolute bottom-10 left-20 size-80 rounded-full bg-blue-400 blur-3xl' />
+          <div className='absolute top-10 right-10 size-64 rounded-full bg-[#3b82f6] blur-3xl' />
+          <div className='absolute bottom-10 left-20 size-80 rounded-full bg-[#3b82f6] blur-3xl' />
         </div>
         <div className='relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center'>
           <motion.div
@@ -363,14 +363,14 @@ export default function HomePage() {
             <h2 className='text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-4'>
               Ready to Start Your Learning Journey?
             </h2>
-            <p className='text-blue-100/80 text-lg mb-8 max-w-xl mx-auto'>
+            <p className='text-[#bfdbfe]/80 text-lg mb-8 max-w-xl mx-auto'>
               Join thousands of students who are already building the future with DTG. Your next career move starts here.
             </p>
             <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-              <Button size='lg' className='bg-white text-blue-900 hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
+              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
                 Explore Courses <ArrowRight className='ml-1.5 size-4' />
               </Button>
-              <Button size='lg' variant='outline' className='border-blue-400/30 text-blue-200 hover:bg-blue-800/50 text-base px-8' onClick={() => navigate('register')}>
+              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8' onClick={() => navigate('register')}>
                 Create Free Account
               </Button>
             </div>

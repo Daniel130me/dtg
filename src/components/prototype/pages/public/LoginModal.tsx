@@ -27,12 +27,12 @@ export default function LoginModal() {
   return (
     <div className='min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12'>
       <Card className='w-full max-w-md p-0 gap-0 overflow-hidden'>
-        <div className='bg-gradient-to-br from-blue-600 to-blue-800 px-6 py-8 text-center'>
+        <div className='bg-gradient-to-br from-[#1d4ed8] to-[#0a1a3e] px-6 py-8 text-center'>
           <div className='mx-auto size-12 rounded-xl bg-white/20 flex items-center justify-center mb-4'>
             <GraduationCap className='size-6 text-white' />
           </div>
           <h1 className='text-xl font-bold text-white'>Welcome Back</h1>
-          <p className='text-blue-100/80 text-sm mt-1'>Sign in to continue learning</p>
+          <p className='text-[#bfdbfe]/80 text-sm mt-1'>Sign in to continue learning</p>
         </div>
 
         <CardContent className='p-6 sm:p-8'>

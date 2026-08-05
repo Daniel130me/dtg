@@ -133,7 +133,7 @@ export default function CourseManagement() {
                         <TableRow key={course.id} className="group">
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="size-10 rounded-lg bg-gradient-to-br from-primary/20 to-blue-500/20 flex items-center justify-center shrink-0">
+                              <div className="size-10 rounded-lg bg-gradient-to-br from-primary/20 to-[#0a1a3e]/20 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-primary">{course.totalSections}</span>
                               </div>
                               <div className="min-w-0">
@@ -160,7 +160,7 @@ export default function CourseManagement() {
                             <Badge
                               className={
                                 course.isPublished
-                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-0'
+                                  ? 'bg-[#1d4ed8]/10 text-[#1d4ed8] dark:text-[#60a5fa] border-0'
                                   : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-0'
                               }
                             >

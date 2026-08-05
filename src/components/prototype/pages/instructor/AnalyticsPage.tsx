@@ -33,8 +33,8 @@ import InstructorLayout from './InstructorLayout';
 import { analyticsData } from '@/lib/prototype/mock-data';
 
 const overviewStats = [
-  { label: 'Total Students', value: analyticsData.totalStudents.toLocaleString(), icon: <Users className="size-5" />, iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
-  { label: 'Total Enrollments', value: analyticsData.totalEnrollments.toLocaleString(), icon: <BookOpen className="size-5" />, iconBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
+  { label: 'Total Students', value: analyticsData.totalStudents.toLocaleString(), icon: <Users className="size-5" />, iconBg: 'bg-[#1d4ed8]/10 text-[#1d4ed8] dark:text-[#60a5fa]' },
+  { label: 'Total Enrollments', value: analyticsData.totalEnrollments.toLocaleString(), icon: <BookOpen className="size-5" />, iconBg: 'bg-[#1d4ed8]/10 text-[#1d4ed8] dark:text-[#60a5fa]' },
   { label: 'Total Revenue', value: `$${analyticsData.revenue.toLocaleString()}`, icon: <DollarSign className="size-5" />, iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
   { label: 'Completion Rate', value: `${analyticsData.completionRate}%`, icon: <Trophy className="size-5" />, iconBg: 'bg-primary/10 text-primary' },
 ];

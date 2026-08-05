@@ -17,8 +17,8 @@ const fadeInUp = {
 };
 
 const stats = [
-  { icon: <Users className='size-5' />, value: instructor.totalStudents.toLocaleString() + '+', label: 'Students Taught', color: 'bg-blue-500/10 text-blue-600' },
-  { icon: <BookOpen className='size-5' />, value: instructor.totalCourses.toString(), label: 'Courses Created', color: 'bg-blue-500/10 text-blue-600' },
+  { icon: <Users className='size-5' />, value: instructor.totalStudents.toLocaleString() + '+', label: 'Students Taught', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
+  { icon: <BookOpen className='size-5' />, value: instructor.totalCourses.toString(), label: 'Courses Created', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
   { icon: <Star className='size-5' />, value: instructor.rating.toString(), label: 'Average Rating', color: 'bg-amber-500/10 text-amber-600' },
   { icon: <Calendar className='size-5' />, value: '12+', label: 'Years Experience', color: 'bg-rose-500/10 text-rose-600' },
 ];
@@ -29,10 +29,10 @@ export default function AboutPage() {
   return (
     <main className='flex-1'>
       {/* Hero Profile Section */}
-      <section className='bg-gradient-to-br from-blue-950 via-blue-900 to-slate-950 relative overflow-hidden'>
+      <section className='bg-gradient-to-br from-[#0a1a3e] via-[#0f2847] to-[#162d50] relative overflow-hidden'>
         <div className='absolute inset-0 opacity-10'>
-          <div className='absolute top-20 left-10 size-72 rounded-full bg-blue-400 blur-3xl' />
-          <div className='absolute bottom-10 right-20 size-80 rounded-full bg-blue-400 blur-3xl' />
+          <div className='absolute top-20 left-10 size-72 rounded-full bg-[#3b82f6] blur-3xl' />
+          <div className='absolute bottom-10 right-20 size-80 rounded-full bg-[#3b82f6] blur-3xl' />
         </div>
         <div className='relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20'>
           <motion.div
@@ -43,17 +43,17 @@ export default function AboutPage() {
           >
             {/* Avatar */}
             <div className='shrink-0'>
-              <div className='w-40 h-40 sm:w-48 sm:h-48 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-2xl shadow-black/20'>
+              <div className='w-40 h-40 sm:w-48 sm:h-48 rounded-2xl bg-gradient-to-br from-[#1d4ed8] to-[#0a1a3e] flex items-center justify-center shadow-2xl shadow-black/20'>
                 <span className='text-5xl sm:text-6xl font-bold text-white/90'>DG</span>
               </div>
             </div>
             {/* Info */}
             <div className='text-center lg:text-left'>
-              <Badge className='bg-blue-500/20 text-blue-200 border-blue-500/30 mb-4'>Lead Instructor</Badge>
+              <Badge className='bg-[#3b82f6]/20 text-[#93c5fd] border-[#3b82f6]/30 mb-4'>Lead Instructor</Badge>
               <h1 className='text-3xl sm:text-4xl font-bold text-white mb-2'>{instructor.name}</h1>
-              <p className='text-blue-200 font-medium mb-4'>{instructor.title}</p>
+              <p className='text-[#93c5fd] font-medium mb-4'>{instructor.title}</p>
               <StarRating rating={instructor.rating} size='md' />
-              <p className='text-sm text-blue-200/60 mt-1 mb-6'>{instructor.rating} average rating from {instructor.totalStudents.toLocaleString()}+ students</p>
+              <p className='text-sm text-[#93c5fd]/60 mt-1 mb-6'>{instructor.rating} average rating from {instructor.totalStudents.toLocaleString()}+ students</p>
               <div className='flex flex-wrap gap-2 justify-center lg:justify-start'>
                 {instructor.socialLinks.twitter && (
                   <Button variant='ghost' size='icon' className='size-9 bg-white/10 hover:bg-white/20 text-white border-white/10'>

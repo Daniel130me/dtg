@@ -39,8 +39,8 @@ export default function ContactPage() {
               <h2 className='text-lg font-bold'>Send us a message</h2>
               {submitted ? (
                 <div className='text-center py-12'>
-                  <div className='mx-auto size-14 rounded-full bg-blue-100 flex items-center justify-center mb-4'>
-                    <Send className='size-6 text-blue-600' />
+                  <div className='mx-auto size-14 rounded-full bg-[#dbeafe] flex items-center justify-center mb-4'>
+                    <Send className='size-6 text-[#1d4ed8]' />
                   </div>
                   <h3 className='font-semibold text-lg mb-1'>Message Sent!</h3>
                   <p className='text-sm text-muted-foreground'>We'll get back to you within 24 hours.</p>
@@ -134,9 +134,9 @@ export default function ContactPage() {
 
         {/* Map Placeholder */}
         <div className='mt-10 rounded-xl border overflow-hidden'>
-          <div className='h-64 sm:h-80 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center relative'>
+          <div className='h-64 sm:h-80 bg-gradient-to-br from-[#eff6ff] to-[#dbeafe] flex items-center justify-center relative'>
             <div className='absolute inset-0 opacity-20'>
-              <div className='w-full h-full' style={{ backgroundImage: 'radial-gradient(circle, oklch(0.432 0.095 166 / 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+              <div className='w-full h-full' style={{ backgroundImage: 'radial-gradient(circle, oklch(0.19 0.065 268 / 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
             </div>
             <div className='relative text-center'>
               <MapPin className='size-8 text-primary mx-auto mb-2' />

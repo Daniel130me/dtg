@@ -21,11 +21,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const categoryGradients: Record<string, string> = {
-  'Web Development': 'from-blue-500 to-blue-600',
-  'Data Science': 'from-amber-500 to-orange-600',
-  'Mobile Development': 'from-violet-500 to-purple-600',
-  'DevOps & Cloud': 'from-slate-500 to-slate-700',
-  'Design & UI/UX': 'from-pink-500 to-rose-600',
+  'Web Development': 'from-[#1d4ed8] to-[#0a1a3e]',
+  'Data Science': 'from-[#2563eb] to-[#0f2847]',
+  'Mobile Development': 'from-[#3b82f6] to-[#1e3a8a]',
+  'DevOps & Cloud': 'from-[#0f2847] to-[#0a1a3e]',
+  'Design & UI/UX': 'from-[#4338ca] to-[#0a1a3e]',
 };
 
 export default function MyLearningPage() {
@@ -98,8 +98,8 @@ export default function MyLearningPage() {
                     {inProgress.map((enrolment, idx) => {
                       const course = courses.find((c) => c.id === enrolment.courseId);
                       const gradient = course
-                        ? categoryGradients[course.categoryName] || 'from-blue-500 to-blue-600'
-                        : 'from-blue-500 to-blue-600';
+                        ? categoryGradients[course.categoryName] || 'from-[#1d4ed8] to-[#0a1a3e]'
+                        : 'from-[#1d4ed8] to-[#0a1a3e]';
 
                       return (
                         <motion.div
@@ -190,8 +190,8 @@ export default function MyLearningPage() {
                       const course = courses.find((c) => c.id === enrolment.courseId);
                       const cert = certMap.get(enrolment.courseId);
                       const gradient = course
-                        ? categoryGradients[course.categoryName] || 'from-blue-500 to-blue-600'
-                        : 'from-blue-500 to-blue-600';
+                        ? categoryGradients[course.categoryName] || 'from-[#1d4ed8] to-[#0a1a3e]'
+                        : 'from-[#1d4ed8] to-[#0a1a3e]';
 
                       return (
                         <motion.div
@@ -204,7 +204,7 @@ export default function MyLearningPage() {
                             <div className={`h-32 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
                               <CheckCircle2 className="size-10 text-white/60" />
                               <div className="absolute top-2 right-2">
-                                <Badge className="bg-blue-500 text-white border-0 text-xs">
+                                <Badge className="bg-[#1d4ed8] text-white border-0 text-xs">
                                   Completed
                                 </Badge>
                               </div>

@@ -39,7 +39,7 @@ const item = {
 
 const notifIcon: Record<string, React.ReactNode> = {
   announcement: <Megaphone className="size-4 text-primary" />,
-  grade: <ClipboardCheck className="size-4 text-blue-500" />,
+  grade: <ClipboardCheck className="size-4 text-[#1d4ed8]" />,
   enrollment: <BookOpen className="size-4 text-amber-500" />,
   reminder: <AlertCircle className="size-4 text-orange-500" />,
   system: <Info className="size-4 text-slate-400" />,
@@ -63,7 +63,7 @@ export default function StudentDashboard() {
       label: 'Completed',
       value: completedEnrolments.length,
       icon: <CheckCircle2 className="size-5" />,
-      color: 'bg-blue-500/10 text-blue-600',
+      color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]',
     },
     {
       label: 'Certificates',
@@ -91,7 +91,7 @@ export default function StudentDashboard() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-blue-800 p-6 sm:p-8 text-white"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-[#0a1a3e] p-6 sm:p-8 text-white"
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
