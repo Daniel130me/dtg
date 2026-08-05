@@ -22,11 +22,11 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const categoryGradients: Record<string, string> = {
-  'Web Development': 'from-teal-600 to-emerald-700',
-  'Data Science': 'from-emerald-600 to-teal-800',
-  'Mobile Development': 'from-teal-500 to-cyan-700',
-  'DevOps & Cloud': 'from-emerald-700 to-teal-900',
-  'Design & UI/UX': 'from-teal-700 to-emerald-600',
+  'Web Development': 'from-blue-600 to-blue-800',
+  'Data Science': 'from-blue-600 to-blue-800',
+  'Mobile Development': 'from-blue-500 to-sky-700',
+  'DevOps & Cloud': 'from-blue-800 to-blue-950',
+  'Design & UI/UX': 'from-blue-700 to-violet-600',
 };
 
 function getInitials(title: string): string {
@@ -46,7 +46,7 @@ function getCategoryIcon(iconName: string, categoryName: string) {
 }
 
 function getGradient(categoryName: string) {
-  return categoryGradients[categoryName] || 'from-teal-600 to-emerald-700';
+  return categoryGradients[categoryName] || 'from-blue-600 to-blue-800';
 }
 
 function findCategoryIcon(categoryId: string, categories: { id: string; icon: string; name: string }[]): string {
@@ -93,7 +93,7 @@ export default function CourseCard({ course, onCourseClick }: CourseCardProps) {
               <Badge className="bg-orange-500 text-white border-orange-500 text-[10px] px-2 py-0.5">Popular</Badge>
             )}
             {course.isFree && (
-              <Badge className="bg-emerald-500 text-white border-emerald-500 text-[10px] px-2 py-0.5">Free</Badge>
+              <Badge className="bg-blue-500 text-white border-blue-500 text-[10px] px-2 py-0.5">Free</Badge>
             )}
           </div>
           <div className="absolute top-3 right-3 z-10">
@@ -133,7 +133,7 @@ export default function CourseCard({ course, onCourseClick }: CourseCardProps) {
             <StarRating rating={course.rating} size="sm" showCount count={course.reviewCount} />
             <div className="font-bold text-primary">
               {course.isFree ? (
-                <span className="text-emerald-600 font-bold">Free</span>
+                <span className="text-blue-600 font-bold">Free</span>
               ) : (
                 <span>${course.price}</span>
               )}

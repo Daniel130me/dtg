@@ -121,9 +121,9 @@ export default function CourseManagement() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-xs">Title</TableHead>
-                        <TableHead className="text-xs">Category</TableHead>
-                        <TableHead className="text-xs text-right">Students</TableHead>
-                        <TableHead className="text-xs text-right">Rating</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Category</TableHead>
+                        <TableHead className="text-xs text-right hidden sm:table-cell">Students</TableHead>
+                        <TableHead className="text-xs text-right hidden lg:table-cell">Rating</TableHead>
                         <TableHead className="text-xs text-center">Status</TableHead>
                         <TableHead className="text-xs text-right">Actions</TableHead>
                       </TableRow>
@@ -133,7 +133,7 @@ export default function CourseManagement() {
                         <TableRow key={course.id} className="group">
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="size-10 rounded-lg bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center shrink-0">
+                              <div className="size-10 rounded-lg bg-gradient-to-br from-primary/20 to-blue-500/20 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-primary">{course.totalSections}</span>
                               </div>
                               <div className="min-w-0">
@@ -142,15 +142,15 @@ export default function CourseManagement() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell">
                             <Badge variant="secondary" className="text-xs whitespace-nowrap">
                               {course.categoryName}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right text-sm font-medium">
+                          <TableCell className="text-right text-sm font-medium hidden sm:table-cell">
                             {course.studentsEnrolled.toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right hidden lg:table-cell">
                             <div className="flex items-center justify-end gap-1">
                               <Star className="size-3.5 fill-amber-400 text-amber-400" />
                               <span className="text-sm font-medium">{course.rating}</span>
@@ -160,7 +160,7 @@ export default function CourseManagement() {
                             <Badge
                               className={
                                 course.isPublished
-                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0'
+                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-0'
                                   : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-0'
                               }
                             >

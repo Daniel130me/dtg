@@ -20,11 +20,11 @@ const lessonIconMap: Record<LessonType, React.ReactNode> = {
 };
 
 const categoryGradients: Record<string, string> = {
-  'Web Development': 'from-teal-600 to-emerald-700',
-  'Data Science': 'from-emerald-600 to-teal-800',
-  'Mobile Development': 'from-teal-500 to-cyan-700',
-  'DevOps & Cloud': 'from-emerald-700 to-teal-900',
-  'Design & UI/UX': 'from-teal-700 to-emerald-600',
+  'Web Development': 'from-blue-600 to-blue-800',
+  'Data Science': 'from-blue-600 to-blue-800',
+  'Mobile Development': 'from-blue-500 to-sky-700',
+  'DevOps & Cloud': 'from-blue-800 to-blue-950',
+  'Design & UI/UX': 'from-blue-700 to-violet-600',
 };
 
 const categoryIconMap: Record<string, React.ReactNode> = {
@@ -50,7 +50,7 @@ export default function CourseDetailPage() {
   const courseReviews = reviews.filter(r => r.courseId === course.id);
   const enrollment = enrolments.find(e => e.courseId === course.id);
 
-  const gradient = categoryGradients[course.categoryName] || 'from-teal-600 to-emerald-700';
+  const gradient = categoryGradients[course.categoryName] || 'from-blue-600 to-blue-800';
   const iconKey = categoryIconNameMap[course.categoryName] || 'Code';
 
   const handleEnrol = () => {
@@ -107,7 +107,7 @@ export default function CourseDetailPage() {
               <CardContent className='p-6'>
                 <div className='text-3xl font-bold mb-1'>
                   {course.isFree ? (
-                    <span className='text-emerald-600'>Free</span>
+                    <span className='text-blue-600'>Free</span>
                   ) : (
                     <>${course.price}</>
                   )}
@@ -183,7 +183,7 @@ export default function CourseDetailPage() {
                       >
                         <div className='flex items-center gap-3'>
                           {lesson.isCompleted ? (
-                            <CheckCircle2 className='size-4 text-emerald-500' />
+                            <CheckCircle2 className='size-4 text-blue-500' />
                           ) : (
                             lessonIconMap[lesson.type]
                           )}
@@ -209,7 +209,7 @@ export default function CourseDetailPage() {
         <Card className='p-6'>
           <h2 className='text-lg font-bold mb-4'>Instructor</h2>
           <div className='flex flex-col sm:flex-row gap-5 items-start'>
-            <div className='size-16 rounded-xl bg-gradient-to-br from-primary to-emerald-700 flex items-center justify-center shrink-0'>
+            <div className='size-16 rounded-xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shrink-0'>
               <span className='text-xl font-bold text-white'>DG</span>
             </div>
             <div className='flex-1'>

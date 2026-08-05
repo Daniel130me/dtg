@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const categoryGradients: Record<string, string> = {
-  'Web Development': 'from-teal-500 to-emerald-600',
+  'Web Development': 'from-blue-500 to-blue-600',
   'Data Science': 'from-amber-500 to-orange-600',
   'Mobile Development': 'from-violet-500 to-purple-600',
   'DevOps & Cloud': 'from-slate-500 to-slate-700',
@@ -98,8 +98,8 @@ export default function MyLearningPage() {
                     {inProgress.map((enrolment, idx) => {
                       const course = courses.find((c) => c.id === enrolment.courseId);
                       const gradient = course
-                        ? categoryGradients[course.categoryName] || 'from-teal-500 to-emerald-600'
-                        : 'from-teal-500 to-emerald-600';
+                        ? categoryGradients[course.categoryName] || 'from-blue-500 to-blue-600'
+                        : 'from-blue-500 to-blue-600';
 
                       return (
                         <motion.div
@@ -190,8 +190,8 @@ export default function MyLearningPage() {
                       const course = courses.find((c) => c.id === enrolment.courseId);
                       const cert = certMap.get(enrolment.courseId);
                       const gradient = course
-                        ? categoryGradients[course.categoryName] || 'from-teal-500 to-emerald-600'
-                        : 'from-teal-500 to-emerald-600';
+                        ? categoryGradients[course.categoryName] || 'from-blue-500 to-blue-600'
+                        : 'from-blue-500 to-blue-600';
 
                       return (
                         <motion.div
@@ -204,7 +204,7 @@ export default function MyLearningPage() {
                             <div className={`h-32 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
                               <CheckCircle2 className="size-10 text-white/60" />
                               <div className="absolute top-2 right-2">
-                                <Badge className="bg-emerald-500 text-white border-0 text-xs">
+                                <Badge className="bg-blue-500 text-white border-0 text-xs">
                                   Completed
                                 </Badge>
                               </div>

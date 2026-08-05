@@ -40,16 +40,16 @@ const statsCards = [
     value: '12,847',
     icon: <Users className="size-5" />,
     change: '+12.5%',
-    color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    iconBg: 'bg-emerald-500/10',
+    color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-blue-500/10',
   },
   {
     label: 'Active Courses',
     value: '12',
     icon: <BookOpen className="size-5" />,
     change: '+2 this month',
-    color: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
-    iconBg: 'bg-teal-500/10',
+    color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-blue-500/10',
   },
   {
     label: 'Total Revenue',
@@ -70,7 +70,7 @@ const statsCards = [
 ];
 
 const activityIcons: Record<string, React.ReactNode> = {
-  Enrolled: <UserPlus className="size-4 text-emerald-500" />,
+  Enrolled: <UserPlus className="size-4 text-blue-500" />,
   Completed: <CheckCircle2 className="size-4 text-primary" />,
   'Submitted Assignment': <MessageSquare className="size-4 text-amber-500" />,
   'Left Review': <Star className="size-4 text-yellow-500" />,
@@ -117,8 +117,8 @@ export default function InstructorDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 mt-3">
-                    <TrendingUp className="size-3.5 text-emerald-500" />
-                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{stat.change}</span>
+                    <TrendingUp className="size-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{stat.change}</span>
                   </div>
                 </CardContent>
               </Card>

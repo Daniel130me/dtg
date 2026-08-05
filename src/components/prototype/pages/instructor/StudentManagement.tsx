@@ -60,7 +60,7 @@ const item = {
 };
 
 function getProgressColor(progress: number) {
-  if (progress >= 80) return '[&>div]:bg-emerald-500';
+  if (progress >= 80) return '[&>div]:bg-blue-500';
   if (progress >= 50) return '[&>div]:bg-primary';
   if (progress >= 25) return '[&>div]:bg-amber-500';
   return '[&>div]:bg-rose-500';

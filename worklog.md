@@ -117,3 +117,72 @@ Stage Summary:
 - Responsive design confirmed on mobile viewport
 - Zero compilation errors and zero runtime errors
 - Professional, polished prototype ready for review
+
+---
+Task ID: 2b
+Agent: blue-theme-public
+Task: Replace all hardcoded teal/emerald color classes with blue/violet/sky/cyan equivalents across public prototype files
+
+Work Log:
+- Updated `src/components/prototype/shared/CourseCard.tsx` - Replaced 5 category gradient definitions, fallback gradient, Free badge color, Free text color
+- Updated `src/components/prototype/pages/public/HomePage.tsx` - Replaced hero gradient (from-teal-900 via-emerald-900 to-teal-950 → from-blue-950 via-blue-900 to-slate-950), 3 glow effect colors, badge styles (bg/text/border), star fill color, "with DTG" text gradient (from-blue-300 to-cyan-300), hero description text, both CTA button colors, stats text, instructor avatar gradient (from-primary to-emerald-700 → from-blue-600 to-blue-800), final CTA section gradient + glow effects + button colors
+- Updated `src/components/prototype/pages/public/AboutPage.tsx` - Replaced hero gradient + glow effects, avatar gradient, badge styles, title/rating text colors, 2 stat card color definitions (teal-500→blue-500, emerald-500→blue-500)
+- Updated `src/components/prototype/pages/public/ContactPage.tsx` - Replaced success icon background (emerald-100→blue-100) and icon color (emerald-600→blue-600), map placeholder gradient (from-teal-50 to-emerald-50 → from-blue-50 to-blue-100)
+- Updated `src/components/prototype/pages/public/LoginModal.tsx` - Replaced header gradient (from-teal-600 to-emerald-700 → from-blue-600 to-blue-800), subtitle text color
+- Updated `src/components/prototype/pages/public/RegisterModal.tsx` - Replaced header gradient (from-teal-600 to-emerald-700 → from-blue-600 to-blue-800), subtitle text color
+- Updated `src/components/prototype/pages/public/CourseDetailPage.tsx` - Replaced 5 category gradient definitions, fallback gradient, Free text color, completed lesson check icon (emerald-500→blue-500), instructor avatar gradient (from-primary to-emerald-700 → from-blue-600 to-blue-800)
+
+Verification:
+- Grep confirmed zero remaining teal-/emerald- references across all 7 files
+- ESLint passes clean with zero errors
+- No logic changes, only Tailwind class name replacements
+
+Stage Summary:
+- 7 files updated with blue theme color mappings
+- Gradient mappings applied per specification (teal→blue, emerald→blue/violet/sky)
+- All files syntactically valid, zero lint errors
+
+---
+Task ID: 2c
+Agent: blue-theme-student
+Task: Replace all hardcoded teal/emerald color classes with blue equivalents across student prototype files
+
+Work Log:
+- Updated `src/components/prototype/pages/student/StudentDashboard.tsx` - Replaced notification icon color (emerald-500→blue-500), completed stats card colors (bg-emerald-500/10 text-emerald-600 → bg-blue-500/10 text-blue-600), welcome banner gradient (from-primary via-teal-600 to-emerald-700 → from-primary to-blue-800)
+- Updated `src/components/prototype/pages/student/MyLearningPage.tsx` - Replaced category gradient definition (from-teal-500 to-emerald-600 → from-blue-500 to-blue-600) in categoryGradients and 2 fallback gradient strings, completed badge color (bg-emerald-500 → bg-blue-500)
+- Updated `src/components/prototype/pages/student/LearningPlayerPage.tsx` - Replaced resource icon color (text-teal-500 → text-blue-500), section completed check icon (text-emerald-500 → text-blue-500), completed lesson text color (text-emerald-600 → text-blue-600), completed lesson check icon (text-emerald-500 → text-blue-500), video placeholder gradient overlay (from-teal-900/30 → from-blue-900/30)
+- Verified `src/components/prototype/layout/StudentLayout.tsx` - No teal/emerald references found, no changes needed
+- Verified `src/components/prototype/pages/student/CertificatesPage.tsx` - No teal/emerald references found, no changes needed
+- Verified `src/components/prototype/pages/student/ProfilePage.tsx` - No teal/emerald references found, no changes needed
+
+Verification:
+- Grep confirmed zero remaining teal-/emerald- references across all 6 files in student pages and layout directories
+- No cyan- references found in any of the 6 target files
+- No logic changes, only Tailwind class name replacements
+
+Stage Summary:
+- 3 files updated with blue theme color mappings (StudentDashboard, MyLearningPage, LearningPlayerPage)
+- 3 files verified clean with no changes needed (StudentLayout, CertificatesPage, ProfilePage)
+- All gradient mappings applied per specification (teal→blue, emerald→blue)
+
+---
+Task ID: 2d
+Agent: blue-theme-instructor
+Task: Replace all hardcoded teal/emerald color classes with blue equivalents across instructor prototype files
+
+Work Log:
+- Updated `src/components/prototype/pages/instructor/InstructorDashboard.tsx` - Replaced emerald-500→blue-500 (stats card color, icon background, activity icon, trending icon), emerald-600→blue-600 (stats change text), emerald-400→blue-400 (dark mode text), teal-500→blue-500 (stats card icon background), teal-600→blue-600 (stats card text), teal-400→blue-400 (dark mode text)
+- Updated `src/components/prototype/pages/instructor/CourseManagement.tsx` - Replaced emerald-500→blue-500 in gradient (to-emerald-500/20 → to-blue-500/20) and published badge (bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 → bg-blue-500/10 text-blue-600 dark:text-blue-400)
+- Updated `src/components/prototype/pages/instructor/StudentManagement.tsx` - Replaced emerald-500→blue-500 in progress bar color ([&>div]:bg-emerald-500 → [&>div]:bg-blue-500)
+- Updated `src/components/prototype/pages/instructor/AnalyticsPage.tsx` - Replaced emerald-500→blue-500, emerald-600→blue-600, emerald-400→blue-400 in Total Students stats iconBg; replaced teal-500→blue-500, teal-600→blue-600, teal-400→blue-400 in Total Enrollments stats iconBg
+- Verified `src/components/prototype/pages/instructor/InstructorLayout.tsx` - No teal/emerald references found, no changes needed
+- Verified `src/components/prototype/pages/instructor/CreateCoursePage.tsx` - No teal/emerald references found, no changes needed
+
+Verification:
+- Grep confirmed zero remaining teal-/emerald- references across all 6 files in instructor directory
+- No logic changes, only Tailwind class name replacements
+
+Stage Summary:
+- 4 files updated with blue theme color mappings (InstructorDashboard, CourseManagement, StudentManagement, AnalyticsPage)
+- 2 files verified clean with no changes needed (InstructorLayout, CreateCoursePage)
+- All color mappings applied per specification (teal-N→blue-N, emerald-N→blue-N)

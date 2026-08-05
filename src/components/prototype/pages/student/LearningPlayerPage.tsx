@@ -49,7 +49,7 @@ const resourceIcons: Record<string, React.ReactNode> = {
   pdf: <File className="size-4 text-red-500" />,
   zip: <Archive className="size-4 text-amber-500" />,
   doc: <FileText className="size-4 text-blue-500" />,
-  link: <ExternalLink className="size-4 text-teal-500" />,
+  link: <ExternalLink className="size-4 text-blue-500" />,
 };
 
 // Mock Q&A data
@@ -215,7 +215,7 @@ export default function LearningPlayerPage() {
                     </p>
                   </div>
                   {sectionCompleted && (
-                    <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                    <CheckCircle2 className="size-3.5 text-blue-500 shrink-0" />
                   )}
                 </button>
 
@@ -243,11 +243,11 @@ export default function LearningPlayerPage() {
                                 isActive
                                   ? 'bg-primary/10 text-primary font-medium'
                                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                                lesson.isCompleted && !isActive && 'text-emerald-600'
+                                lesson.isCompleted && !isActive && 'text-blue-600'
                               )}
                             >
                               {lesson.isCompleted ? (
-                                <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500" />
+                                <CheckCircle2 className="size-3.5 shrink-0 text-blue-500" />
                               ) : (
                                 <Circle className="size-3.5 shrink-0" />
                               )}
@@ -322,7 +322,7 @@ export default function LearningPlayerPage() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Video Placeholder */}
           <div className="relative w-full bg-neutral-900 aspect-video max-h-[60vh] flex items-center justify-center">
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-900/30 to-neutral-900" />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/30 to-neutral-900" />
             <div className="relative z-10 flex flex-col items-center gap-3">
               <button className="size-16 sm:size-20 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center transition-colors border border-white/20">
                 <Play className="size-7 sm:size-8 text-white ml-1" />
