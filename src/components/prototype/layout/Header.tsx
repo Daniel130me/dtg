@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useNav } from '@/lib/prototype/navigation';
 import { notifications } from '@/lib/prototype/mock-data';
+import type { ViewName } from '@/lib/prototype/types';
 
 const navLinks = [
   { label: 'Home', view: 'home' as const },
@@ -22,8 +23,8 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  const handleNav = (view: string) => {
-    navigate(view as any);
+  const handleNav = (view: ViewName) => {
+    navigate(view);
     setMobileOpen(false);
   };
 
@@ -65,7 +66,7 @@ export default function Header() {
               {/* Notification Bell */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' size='icon' className='relative'>
+                  <Button variant='ghost' size='icon' className='relative' aria-label='Open notifications'>
                     <Bell className='size-5' />
                     {unreadCount > 0 && (
                       <span className='absolute -top-0.5 -right-0.5 size-4.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center'>
@@ -92,7 +93,7 @@ export default function Header() {
               {/* User Avatar Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' className='gap-2 pl-2 pr-3'>
+                  <Button variant='ghost' className='gap-2 pl-2 pr-3' aria-label='Open account menu'>
                     <Avatar className='size-8'>
                       <AvatarFallback className='bg-primary/10 text-primary text-xs font-bold'>JA</AvatarFallback>
                     </Avatar>
@@ -102,7 +103,7 @@ export default function Header() {
                 <DropdownMenuContent align='end' className='w-56'>
                   <DropdownMenuLabel>
                     <div className='flex flex-col gap-0.5'>
-                      <span className='font-medium text-sm'>{userRole === 'instructor' ? 'Daniel T. George' : 'John Adebayo'}</span>
+                      <span className='font-medium text-sm'>{userRole === 'owner' ? 'Daniel T. George' : 'John Adebayo'}</span>
                       <span className='text-xs text-muted-foreground font-normal capitalize'>{userRole}</span>
                     </div>
                   </DropdownMenuLabel>
@@ -112,7 +113,7 @@ export default function Header() {
                       <BookOpen className='size-4 mr-2' /> My Learning
                     </DropdownMenuItem>
                   )}
-                  {userRole === 'instructor' && (
+                  {userRole === 'owner' && (
                     <DropdownMenuItem onClick={() => navigate('instructor-dashboard')} className='cursor-pointer'>
                       <LayoutDashboard className='size-4 mr-2' /> Dashboard
                     </DropdownMenuItem>
@@ -141,7 +142,7 @@ export default function Header() {
           {/* Mobile Menu */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild className='md:hidden'>
-              <Button variant='ghost' size='icon'>
+              <Button variant='ghost' size='icon' aria-label='Open navigation menu'>
                 <Menu className='size-5' />
               </Button>
             </SheetTrigger>
@@ -176,7 +177,7 @@ export default function Header() {
                         My Learning
                       </button>
                     )}
-                    {userRole === 'instructor' && (
+                    {userRole === 'owner' && (
                       <button onClick={() => handleNav('instructor-dashboard')} className='px-3 py-2.5 rounded-md text-sm font-medium text-left text-muted-foreground hover:bg-accent transition-colors'>
                         Dashboard
                       </button>

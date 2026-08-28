@@ -65,7 +65,7 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
         </button>
       </div>
 
-      {/* Instructor Info */}
+      {/* Platform owner information */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm shrink-0">
@@ -73,7 +73,7 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate">{instructor.name}</p>
-            <p className="text-xs text-background/60">Instructor</p>
+            <p className="text-xs text-background/60">Platform Owner</p>
           </div>
         </div>
       </div>

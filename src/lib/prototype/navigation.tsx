@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import type { ViewName } from './types';
 
 interface NavigationState {
@@ -8,63 +9,109 @@ interface NavigationState {
   previousView: ViewName | null;
   viewParams: Record<string, string>;
   isAuthenticated: boolean;
-  userRole: 'student' | 'instructor';
+  userRole: 'student' | 'owner';
 }
 
 interface NavigationContextType extends NavigationState {
   navigate: (view: ViewName, params?: Record<string, string>) => void;
   goBack: () => void;
-  login: (role?: 'student' | 'instructor') => void;
+  login: (role?: 'student' | 'owner') => void;
   logout: () => void;
 }
 
-const defaultState: NavigationState = {
-  currentView: 'home',
-  previousView: null,
-  viewParams: {},
-  isAuthenticated: false,
-  userRole: 'student',
+const VIEW_ROUTES: Record<ViewName, string> = {
+  home: '/',
+  courses: '/courses',
+  'course-detail': '/courses/course-1',
+  about: '/about',
+  contact: '/contact',
+  login: '/login',
+  register: '/register',
+  'student-dashboard': '/dashboard',
+  'my-learning': '/learning',
+  'learning-player': '/learning/course-1/les-1',
+  certificates: '/certificates',
+  profile: '/profile',
+  'instructor-dashboard': '/owner',
+  'course-management': '/owner/courses',
+  'student-management': '/owner/students',
+  analytics: '/owner/analytics',
+  'create-course': '/owner/courses/new',
 };
+
+function resolveView(pathname: string): ViewName {
+  if (pathname === '/') return 'home';
+  if (pathname === '/courses') return 'courses';
+  if (pathname.startsWith('/courses/')) return 'course-detail';
+  if (pathname === '/about') return 'about';
+  if (pathname === '/contact') return 'contact';
+  if (pathname === '/login') return 'login';
+  if (pathname === '/register') return 'register';
+  if (pathname === '/dashboard') return 'student-dashboard';
+  if (pathname === '/learning') return 'my-learning';
+  if (pathname.startsWith('/learning/')) return 'learning-player';
+  if (pathname === '/certificates') return 'certificates';
+  if (pathname === '/profile') return 'profile';
+  if (pathname === '/owner') return 'instructor-dashboard';
+  if (pathname === '/owner/courses/new') return 'create-course';
+  if (pathname === '/owner/courses') return 'course-management';
+  if (pathname === '/owner/students') return 'student-management';
+  if (pathname === '/owner/analytics') return 'analytics';
+  return 'home';
+}
+
+function routeFor(view: ViewName, params: Record<string, string>): string {
+  if (view === 'course-detail') return `/courses/${encodeURIComponent(params.courseId || 'course-1')}`;
+  if (view === 'learning-player') {
+    const courseId = encodeURIComponent(params.courseId || 'course-1');
+    const lessonId = encodeURIComponent(params.lessonId || 'les-1');
+    return `/learning/${courseId}/${lessonId}`;
+  }
+  return VIEW_ROUTES[view];
+}
 
 const NavigationContext = createContext<NavigationContextType | null>(null);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<NavigationState>(defaultState);
+  const router = useRouter();
+  const pathname = usePathname();
+  const routeParams = useParams<Record<string, string | string[]>>();
+  const currentView = resolveView(pathname);
+  const [previousView, setPreviousView] = useState<ViewName | null>(null);
+  // Temporary until Phase 3 replaces prototype authentication with server sessions.
+  const [authState, setAuthState] = useState<Pick<NavigationState, 'isAuthenticated' | 'userRole'>>({
+    isAuthenticated: false,
+    userRole: 'student',
+  });
+
+  const viewParams = useMemo(
+    () => Object.fromEntries(
+      Object.entries(routeParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
+    ),
+    [routeParams],
+  );
 
   const navigate = useCallback((view: ViewName, params: Record<string, string> = {}) => {
-    setState(prev => ({
-      currentView: view,
-      previousView: prev.currentView,
-      viewParams: { ...params },
-    }));
-    window.scrollTo(0, 0);
-  }, []);
+    setPreviousView(currentView);
+    router.push(routeFor(view, params));
+  }, [currentView, router]);
 
-  const goBack = useCallback(() => {
-    setState(prev => ({
-      currentView: prev.previousView || 'home',
-      previousView: null,
-      viewParams: {},
-    }));
-  }, []);
+  const goBack = useCallback(() => router.back(), [router]);
 
-  const login = useCallback((role: 'student' | 'instructor' = 'student') => {
-    setState(prev => ({
-      ...prev,
-      isAuthenticated: true,
-      userRole: role,
-      currentView: role === 'instructor' ? 'instructor-dashboard' : 'student-dashboard',
-      previousView: 'home',
-    }));
-    window.scrollTo(0, 0);
-  }, []);
+  const login = useCallback((role: 'student' | 'owner' = 'student') => {
+    setAuthState({ isAuthenticated: true, userRole: role });
+    router.replace(role === 'owner' ? '/owner' : '/dashboard');
+  }, [router]);
 
   const logout = useCallback(() => {
-    setState({ ...defaultState });
-  }, []);
+    setAuthState({ isAuthenticated: false, userRole: 'student' });
+    router.replace('/');
+  }, [router]);
 
   return (
-    <NavigationContext.Provider value={{ ...state, navigate, goBack, login, logout }}>
+    <NavigationContext.Provider
+      value={{ currentView, previousView, viewParams, ...authState, navigate, goBack, login, logout }}
+    >
       {children}
     </NavigationContext.Provider>
   );

@@ -20,8 +20,8 @@ export default function LoginModal() {
     login('student');
   };
 
-  const handleInstructorLogin = () => {
-    login('instructor');
+  const handleOwnerLogin = () => {
+    login('owner');
   };
 
   return (
@@ -83,8 +83,8 @@ export default function LoginModal() {
             <span className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground'>or</span>
           </div>
 
-          <Button variant='outline' className='w-full' onClick={handleInstructorLogin}>
-            Login as Instructor
+          <Button variant='outline' className='w-full' onClick={handleOwnerLogin}>
+            Owner Preview
           </Button>
 
           <p className='text-center text-sm text-muted-foreground mt-6'>
