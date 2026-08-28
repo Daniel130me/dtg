@@ -25,7 +25,7 @@ const textSizeMap = {
 };
 
 export default function StarRating({ rating, size = 'md', showCount = false, count, className }: StarRatingProps) {
-  const stars = [];
+  const stars: React.ReactNode[] = [];
   const fullStars = Math.floor(rating);
   const hasHalf = rating - fullStars >= 0.25 && rating - fullStars < 0.75;
   const hasRoundUp = rating - fullStars >= 0.75;

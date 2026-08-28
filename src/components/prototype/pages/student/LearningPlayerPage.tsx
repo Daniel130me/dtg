@@ -149,7 +149,7 @@ export default function LearningPlayerPage() {
     });
   };
 
-  const selectLesson = (les: Lesson & { sectionId: string }) => {
+  const selectLesson = (les: Pick<Lesson, 'id'>) => {
     navigate('learning-player', { courseId: course.id, lessonId: les.id });
   };
 
@@ -235,7 +235,7 @@ export default function LearningPlayerPage() {
                             <button
                               key={lesson.id}
                               onClick={() => {
-                                selectLesson({ ...lesson, sectionTitle: section.title, sectionId: section.id });
+                                selectLesson(lesson);
                                 setCurriculumOpen(false);
                               }}
                               className={cn(
