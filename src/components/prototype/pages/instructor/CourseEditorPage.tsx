@@ -7,10 +7,12 @@ import { motion } from 'framer-motion';
 import {
   Archive,
   ArrowLeft,
+  BookOpenCheck,
   ChevronDown,
   ChevronUp,
   ClipboardList,
   ExternalLink,
+  FileCheck,
   FileText,
   HelpCircle,
   Layers,
@@ -60,6 +62,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import InstructorLayout from './InstructorLayout';
+import QuizBuilder from './quiz-builder';
+import AssignmentEditor from './assignment-editor';
 import {
   archiveCourse,
   createLesson,
@@ -679,6 +683,8 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
   const [lessonDialog, setLessonDialog] = useState<LessonDialogState>(null);
   const [lessonDeleteTarget, setLessonDeleteTarget] = useState<OwnerLessonDto | null>(null);
   const [lessonMoveTarget, setLessonMoveTarget] = useState<OwnerLessonDto | null>(null);
+  // Quiz/assignment authoring target: mounted only while its dialog is open.
+  const [assessmentLesson, setAssessmentLesson] = useState<OwnerLessonDto | null>(null);
 
   const sections = useMemo(
     () => [...course.sections].sort((a, b) => a.position - b.position),
@@ -931,6 +937,22 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                           size="icon"
                           className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
                           disabled={busy}
+                          onClick={() => setAssessmentLesson(lesson)}
+                          aria-label={
+                            lesson.type === 'QUIZ' ? 'Configure quiz' : 'Configure assignment'
+                          }
+                        >
+                          {lesson.type === 'QUIZ' ? (
+                            <BookOpenCheck className="size-3.5" />
+                          ) : (
+                            <FileCheck className="size-3.5" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={busy}
                           onClick={() => setLessonDialog({ mode: 'edit', lesson })}
                           aria-label="Edit lesson"
                         >
@@ -1062,6 +1084,40 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
           onClose={() => setLessonMoveTarget(null)}
           onSubmit={handleLessonMove}
         />
+      )}
+
+      {/* Quiz/assignment authoring for QUIZ/ASSIGNMENT lessons. Mounted only
+          while open so each builder starts a fresh load (same reset pattern
+          as the other dialogs above). */}
+      {assessmentLesson && (
+        <Dialog open onOpenChange={(open) => !open && setAssessmentLesson(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {assessmentLesson.type === 'QUIZ' ? (
+                  <BookOpenCheck className="size-4 text-primary" />
+                ) : (
+                  <FileCheck className="size-4 text-primary" />
+                )}
+                {assessmentLesson.type === 'QUIZ' ? 'Quiz builder' : 'Assignment editor'}
+              </DialogTitle>
+              <DialogDescription>{assessmentLesson.title}</DialogDescription>
+            </DialogHeader>
+            {assessmentLesson.type === 'QUIZ' ? (
+              <QuizBuilder
+                key={assessmentLesson.id}
+                lessonId={assessmentLesson.id}
+                lessonTitle={assessmentLesson.title}
+              />
+            ) : (
+              <AssignmentEditor
+                key={assessmentLesson.id}
+                lessonId={assessmentLesson.id}
+                lessonTitle={assessmentLesson.title}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
