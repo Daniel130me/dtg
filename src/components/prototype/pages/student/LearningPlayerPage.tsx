@@ -34,7 +34,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import PlayerNotesPanel from '@/components/prototype/pages/student/player-notes-panel';
 import PlayerQAPanel from '@/components/prototype/pages/student/player-qa-panel';
+import PlayerQuizPanel from '@/components/prototype/pages/student/player-quiz-panel';
+import PlayerAssignmentPanel from '@/components/prototype/pages/student/player-assignment-panel';
 import { fetchCourseProgress, fetchLessonAccess, markLessonComplete } from '@/features/learning/api';
+import { claimCertificate } from '@/features/learning/certificates-api';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatLessonDuration } from '@/lib/client/format';
 import { LESSON_NOT_FOUND, type CourseProgressDto, type LessonAccessDto } from '@/contracts/learning';
@@ -242,6 +245,8 @@ export default function LearningPlayerPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [curriculumOpen, setCurriculumOpen] = useState(false);
+  // Certificate claim pending guard (celebration panel affordance).
+  const [claimingCertificate, setClaimingCertificate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,6 +345,24 @@ export default function LearningPlayerPage() {
     }
   }
 
+  /** Claim is idempotent server-side; CERTIFICATE_NOT_ELIGIBLE surfaces the
+   *  honest unmet-requirements message from the API. */
+  async function handleClaimCertificate() {
+    if (claimingCertificate) return;
+    setClaimingCertificate(true);
+    try {
+      await claimCertificate(slug);
+      toast.success('Certificate issued');
+      router.push('/certificates');
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof ApiClientError ? err.message : 'Could not claim your certificate.',
+      );
+    } finally {
+      setClaimingCertificate(false);
+    }
+  }
+
   function goToLesson(target: { id: string } | null) {
     if (!target) return;
     router.push(`/learning/${encodeURIComponent(slug)}/${encodeURIComponent(target.id)}`);
@@ -410,16 +433,26 @@ export default function LearningPlayerPage() {
       </div>
     );
   } else {
-    // QUIZ / ASSIGNMENT arrive in Phase 9; completion stays enabled (the
+    // QUIZ / ASSIGNMENT (Phase 9): the real assessment panels render for
+    // enrolled learners (access gating is decided here, same as notes);
+    // preview visitors get the enroll message. Completion stays enabled (the
     // server is the gate for what counts).
-    lessonBody = (
-      <div className='rounded-lg border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900 dark:bg-amber-950'>
-        {lessonTypeIconMap[lesson.type]}
-        <p className='text-sm font-medium text-amber-800 dark:text-amber-200 mt-2'>
-          This lesson type arrives in Phase 9
-        </p>
-        <p className='text-xs text-amber-700/80 dark:text-amber-300/80 mt-1'>
-          Quizzes and assignments are not interactive yet — completion tracking still works.
+    lessonBody = isEnrolled ? (
+      lesson.type === 'QUIZ' ? (
+        <PlayerQuizPanel lessonId={lessonId} />
+      ) : (
+        <PlayerAssignmentPanel lessonId={lessonId} />
+      )
+    ) : (
+      <div className='flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950'>
+        {lesson.type === 'QUIZ' ? (
+          <HelpCircle className='mt-0.5 size-4 shrink-0 text-amber-600' />
+        ) : (
+          <PenTool className='mt-0.5 size-4 shrink-0 text-amber-600' />
+        )}
+        <p className='text-sm text-amber-800 dark:text-amber-200'>
+          {lesson.type === 'QUIZ' ? 'Quizzes' : 'Assignments'} are available after enrolling in the
+          course.
         </p>
       </div>
     );
@@ -566,9 +599,20 @@ export default function LearningPlayerPage() {
                     You finished every lesson in {lessonAccess.course.title}.
                   </p>
                 </div>
-                <Button asChild size='sm' variant='outline'>
-                  <Link href='/learning'>Back to My Learning</Link>
-                </Button>
+                <div className='flex shrink-0 flex-col gap-2 sm:flex-row'>
+                  <Button
+                    size='sm'
+                    onClick={handleClaimCertificate}
+                    disabled={claimingCertificate}
+                    className='gap-1.5'
+                  >
+                    {claimingCertificate && <Loader2 className='size-3.5 animate-spin' />}
+                    Get your certificate
+                  </Button>
+                  <Button asChild size='sm' variant='outline'>
+                    <Link href='/learning'>Back to My Learning</Link>
+                  </Button>
+                </div>
               </div>
             )}
 
