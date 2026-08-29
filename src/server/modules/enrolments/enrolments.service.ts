@@ -99,7 +99,7 @@ export async function enrollInFreeCourse(userId: string, slug: string, requestId
       422,
       eligibility.blocker!,
       eligibility.blocker === "PAID_COURSE_REQUIRES_CHECKOUT"
-        ? "This course requires checkout. Paid enrolment is coming soon."
+        ? "This course requires checkout to enroll."
         : "This course is not open for enrolment.",
     );
   }

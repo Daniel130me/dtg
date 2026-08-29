@@ -137,11 +137,74 @@ export const openApiDocument = {
         security: [{ sessionCookie: [] }],
         parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
         responses: {
-          "200": { description: "Provider checkout session (requires a configured payment provider)." },
+          "200": {
+            description:
+              "Checkout session pointing at the Flutterwave hosted payment page (requires FLUTTERWAVE_SECRET_KEY and FLUTTERWAVE_WEBHOOK_HASH).",
+          },
           "401": { description: "Authentication is required." },
           "404": { description: "The course does not exist." },
           "422": { description: "The course is not published or is free." },
           "503": { description: "No launch payment provider is configured yet." },
+        },
+      },
+    },
+    "/payments/flutterwave/webhook": {
+      post: {
+        operationId: "receiveFlutterwaveWebhook",
+        responses: {
+          "200": {
+            description:
+              "Delivery handled; the outcome (fulfilled/recorded/rejected/duplicate) is returned so the provider stops retrying.",
+          },
+          "401": { description: "The verif-hash signature is missing or invalid." },
+          "502": { description: "Provider verification failed; the provider will retry the delivery." },
+        },
+      },
+    },
+    "/payments/orders/{orderId}": {
+      get: {
+        operationId: "getPaymentOrderStatus",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "orderId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "The caller's order status with its latest payment summary." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Order not found or not owned by the caller." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/payments/orders/{orderId}/reconcile": {
+      post: {
+        operationId: "reconcilePaymentOrder",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "orderId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Fresh order status after server-side reconciliation." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Order not found or not owned by the caller." },
+          "422": { description: "Body validation failed." },
+          "502": { description: "Provider verification failed." },
+        },
+      },
+    },
+    "/owner/payments/{paymentId}/refund": {
+      post: {
+        operationId: "refundOwnerPayment",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "paymentId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Refund requested at the provider and recorded." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Payment not found." },
+          "422": { description: "Refund not allowed (payment not captured or amount exceeds captured)." },
         },
       },
     },

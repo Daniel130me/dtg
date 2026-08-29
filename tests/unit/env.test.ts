@@ -47,4 +47,25 @@ describe("server environment", () => {
       /must be configured together/,
     );
   });
+
+  it("rejects partial Flutterwave configuration", () => {
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, FLUTTERWAVE_SECRET_KEY: "FLWSECK-test" }),
+      /FLUTTERWAVE_SECRET_KEY and FLUTTERWAVE_WEBHOOK_HASH must be configured together/,
+    );
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, FLUTTERWAVE_WEBHOOK_HASH: "whsec" }),
+      /must be configured together/,
+    );
+  });
+
+  it("accepts a complete Flutterwave configuration", () => {
+    const env = getServerEnv({
+      DATABASE_URL: databaseUrl,
+      FLUTTERWAVE_SECRET_KEY: "FLWSECK-test",
+      FLUTTERWAVE_WEBHOOK_HASH: "whsec-test",
+    });
+    assert.equal(env.FLUTTERWAVE_SECRET_KEY, "FLWSECK-test");
+    assert.equal(env.FLUTTERWAVE_WEBHOOK_HASH, "whsec-test");
+  });
 });

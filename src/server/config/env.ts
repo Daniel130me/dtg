@@ -40,6 +40,8 @@ const serverEnvSchema = z
     SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
     SMTP_USER: optionalString,
     SMTP_PASSWORD: optionalString,
+    FLUTTERWAVE_SECRET_KEY: optionalString,
+    FLUTTERWAVE_WEBHOOK_HASH: optionalString,
   })
   .superRefine((value, context) => {
     if (
@@ -71,6 +73,19 @@ const serverEnvSchema = z
         code: "custom",
         path: ["SMTP_HOST"],
         message: "EMAIL_FROM, SMTP_HOST, SMTP_USER, and SMTP_PASSWORD must be configured together",
+      });
+    }
+
+    // A secret key without the webhook hash (or vice versa) would let paid
+    // checkout start but leave webhook fulfilment unverifiable, so both halves
+    // of the Flutterwave integration must be configured together.
+    const flutterwaveValues = [value.FLUTTERWAVE_SECRET_KEY, value.FLUTTERWAVE_WEBHOOK_HASH];
+    const configuredFlutterwaveValues = flutterwaveValues.filter(Boolean).length;
+    if (configuredFlutterwaveValues > 0 && configuredFlutterwaveValues !== flutterwaveValues.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["FLUTTERWAVE_SECRET_KEY"],
+        message: "FLUTTERWAVE_SECRET_KEY and FLUTTERWAVE_WEBHOOK_HASH must be configured together",
       });
     }
   });
