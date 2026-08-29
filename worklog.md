@@ -353,3 +353,21 @@ Stage Summary:
 - COURSE_NOT_PUBLISHABLE details are propagated end-to-end (ApiError.details → ApiClientError.details → toast bullet list of failing publish checks)
 - Request schemas are duplicated client-side in contracts/owner-courses.ts (same rules/constants as the server module) because client components must not import src/server; backend unit tests still pass against the shared enum schemas
 - Deviations: (1) Course Media card left visual but disabled — no thumbnail/promo fields exist in the authoring API; (2) cross-section lesson move appends to the end of the target section (predictable, no position picker); (3) sonner Toaster mounted in the owner layout rather than root layout to keep the change owner-scoped; (4) dashboards/analytics/student-management intentionally left on mock data per scope
+
+---
+Task ID: 8-a/8-f (coordinator)
+Agent: main-coordinator
+Task: Phase 6 course domain foundation, sandbox rebuild, E2E verification and integration fix
+
+Work Log:
+- (8-a) Added course domain schema (Category, Course, CourseSection, Lesson, CourseRequirement, CourseOutcome) with position uniqueness, catalog indexes, pg_trgm GIN title index; deterministic seed sourcing prototype mock data (5 categories, 6 published courses)
+- Sandbox home directory was wiped between turns: rebuilt Postgres under <project>/.pg (survives restarts), recreated .env, re-ran migrations/seed/owner bootstrap; removed a sandbox auto-commit that re-tracked dev.pid
+- (8-f) Browser E2E: homepage featured courses + categories render real DB data; /courses URL-driven filters verified (?category=web-development -> 3 of 3); course detail by slug renders real curriculum/requirements/instructor
+- E2E found one integration bug: listOwnerCourses client wrapper did not unwrap the { courses } page envelope -> page.items undefined -> "Cannot read properties of undefined (reading 'length')" in CourseManagement; fixed in src/features/owner/api.ts and audited all other owner endpoints (all other envelopes match)
+- E2E owner flow verified: create course -> editor (Draft v1) -> publish blocked with failing-checks toast (422 COURSE_NOT_PUBLISHABLE) -> add section (v2) -> add lesson (v3) -> publish succeeds (v4, toast "is now live") -> course live at /courses/intro-to-cloud-computing
+- Also verified: unauthenticated /owner/* renders login (guard works); earlier /owner/courses server hang was Turbopack dev compile congestion, resolved on restart (not an app bug)
+
+Stage Summary:
+- Phase 6 milestone 1 complete: schema + seed (8-a), catalog API (8-b), authoring API (8-c), public frontend (8-d), owner frontend (8-e), integration fix + E2E (8-f)
+- All quality gates pass: typecheck clean, lint clean, 53/53 unit tests
+- Known dev-only quirks: sandbox injects SQLite DATABASE_URL (export Postgres URL for server/tests); verification emails need SMTP; Radix aria-controls hydration warning upstream
