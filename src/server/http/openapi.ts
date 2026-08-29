@@ -105,6 +105,61 @@ export const openApiDocument = {
         },
       },
     },
+    "/courses/{slug}/enroll": {
+      post: {
+        operationId: "enrollInFreeCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Enrolment created, or the existing one returned (idempotent)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The course does not exist." },
+          "422": { description: "The course is not published or requires checkout." },
+        },
+      },
+    },
+    "/courses/{slug}/enrolment": {
+      get: {
+        operationId: "getCourseEnrolmentState",
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "The caller's enrolment state for the course." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The course does not exist." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/courses/{slug}/checkout": {
+      post: {
+        operationId: "initializeCheckout",
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Provider checkout session (requires a configured payment provider)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The course does not exist." },
+          "422": { description: "The course is not published or is free." },
+          "503": { description: "No launch payment provider is configured yet." },
+        },
+      },
+    },
+    "/learning/enrolments": {
+      get: {
+        operationId: "listMyEnrolments",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string", enum: ["ACTIVE", "COMPLETED"] } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 24 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated my-learning enrolment list." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
     "/owner/courses": {
       get: {
         operationId: "listOwnerCourses",
