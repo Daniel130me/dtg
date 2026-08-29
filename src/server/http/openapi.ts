@@ -218,8 +218,218 @@ export const openApiDocument = {
           { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 24 } },
         ],
         responses: {
-          "200": { description: "Cursor-paginated my-learning enrolment list." },
+          "200": {
+            description:
+              "Cursor-paginated my-learning enrolment list; ACTIVE/COMPLETED enrolments carry a progress block (completedLessons/totalLessons/progressPercent).",
+          },
           "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/dashboard": {
+      get: {
+        operationId: "getLearnerDashboard",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Learner stat tiles plus the continue-learning rail." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/courses/{slug}/progress": {
+      get: {
+        operationId: "getCourseProgress",
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": {
+            description:
+              "Published curriculum with the caller's per-lesson completion map (zero progress when not enrolled).",
+          },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The course does not exist or is not published." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}": {
+      get: {
+        operationId: "getLessonAccess",
+        // Optional auth: signed-out visitors may read preview lessons.
+        security: [{ sessionCookie: [] }, {}],
+        description:
+          "Resolves the caller's access level. Works signed-out: preview lessons are readable anonymously, everything else answers access NONE with content stripped.",
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Lesson detail behind the access rules (content null when locked)." },
+          "404": { description: "The lesson does not exist or is not published." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/progress": {
+      post: {
+        operationId: "markLessonProgress",
+        security: [{ sessionCookie: [] }],
+        description: "Monotonic, idempotent completion: the only accepted body is { completed: true }.",
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Completion recorded (or repeated) with the course progress snapshot." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or is not published." },
+          "422": {
+            description:
+              "The caller is not enrolled (COURSE_NOT_ENROLLED), or the body attempted to reverse completion (LESSON_COMPLETION_MONOTONIC).",
+          },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/note": {
+      get: {
+        operationId: "getLessonNote",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "The caller's note for the lesson, or null when none saved." },
+          "401": { description: "Authentication is required." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+      put: {
+        operationId: "saveLessonNote",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Note upserted (one note per learner per lesson)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or is not published." },
+          "422": { description: "Not enrolled in the lesson's course, or body validation failed." },
+        },
+      },
+      delete: {
+        operationId: "deleteLessonNote",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Note deleted (idempotent; succeeds without a note)." },
+          "401": { description: "Authentication is required." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/learning/notes/export": {
+      get: {
+        operationId: "exportMyNotes",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "Markdown download (text/markdown attachment) of every saved note.",
+          },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/threads": {
+      get: {
+        operationId: "listLessonThreads",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 20 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated active question threads (newest activity first)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or is not published." },
+          "422": { description: "Not enrolled and not a preview lesson, or query validation failed." },
+        },
+      },
+      post: {
+        operationId: "createLessonThread",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Thread created with its opening question post." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or is not published." },
+          "422": { description: "Not enrolled in the lesson's course, or body validation failed." },
+        },
+      },
+    },
+    "/learning/threads/{threadId}": {
+      get: {
+        operationId: "getDiscussionThread",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "threadId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Thread detail with its ascending reply page." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Thread missing, hidden, or on an unpublished lesson." },
+          "422": { description: "Not enrolled and not a preview lesson, or query validation failed." },
+        },
+      },
+    },
+    "/learning/threads/{threadId}/replies": {
+      post: {
+        operationId: "replyToThread",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "threadId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Reply posted; thread counters updated." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Thread missing, hidden, or on an unpublished lesson." },
+          "422": { description: "Not enrolled and not a preview lesson, or body validation failed." },
+        },
+      },
+    },
+    "/owner/discussions/threads/{threadId}": {
+      patch: {
+        operationId: "moderateDiscussionThread",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "threadId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Thread status updated (hiding filters it from learner reads)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Thread not found." },
+          "422": { description: "Body validation failed." },
+        },
+      },
+    },
+    "/owner/discussions/posts/{postId}": {
+      patch: {
+        operationId: "moderateDiscussionPost",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "postId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Post status updated (hiding filters only that post)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Post not found." },
+          "422": { description: "Body validation failed." },
         },
       },
     },

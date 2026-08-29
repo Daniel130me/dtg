@@ -63,6 +63,17 @@ export const enrolledCourseSummarySchema = z.object({
   categorySlug: z.string(),
 });
 
+/**
+ * Learner progress against the enrolled course. Null on the enrolment when it
+ * no longer represents an active learning journey (REVOKED); present (possibly
+ * at zero) for ACTIVE and COMPLETED enrolments.
+ */
+export const enrolmentProgressSchema = z.object({
+  completedLessons: z.number().int().nonnegative(),
+  totalLessons: z.number().int().nonnegative(),
+  progressPercent: z.number().int().min(0).max(100),
+});
+
 export const enrolmentDtoSchema = z.object({
   id: z.uuid(),
   courseId: z.uuid(),
@@ -72,6 +83,7 @@ export const enrolmentDtoSchema = z.object({
   completedAt: z.iso.datetime().nullable(),
   revokedAt: z.iso.datetime().nullable(),
   course: enrolledCourseSummarySchema,
+  progress: enrolmentProgressSchema.nullable(),
 });
 
 export const paginatedEnrolmentsSchema = z.object({
@@ -87,6 +99,7 @@ export const courseEnrolmentStateSchema = z.object({
 });
 
 export type EnrolledCourseSummaryDto = z.infer<typeof enrolledCourseSummarySchema>;
+export type EnrolmentProgressDto = z.infer<typeof enrolmentProgressSchema>;
 export type EnrolmentDto = z.infer<typeof enrolmentDtoSchema>;
 export type PaginatedEnrolmentsDto = z.infer<typeof paginatedEnrolmentsSchema>;
 export type CourseEnrolmentStateDto = z.infer<typeof courseEnrolmentStateSchema>;

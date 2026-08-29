@@ -4,6 +4,7 @@ import {
   enrolmentListQuerySchema,
   type CourseEnrolmentStateDto,
   type EnrolmentDto,
+  type EnrolmentProgressDto,
   type PaginatedEnrolmentsDto,
 } from "@/contracts/enrolments";
 import { db } from "@/server/db/client";
@@ -11,6 +12,7 @@ import { withTransaction } from "@/server/db/transaction";
 import { ApiError } from "@/server/http/errors";
 import { decodeCursor, encodeCursor } from "@/server/http/pagination";
 import { describeFreeEnrolmentEligibility } from "@/server/modules/enrolments/enrolments.logic";
+import { computeProgressPercent } from "@/server/modules/learning/learning.logic";
 
 // Authorization model: /api/v1/learning routes resolve the caller through
 // requireAuthenticatedUser(headers) and every query is pinned to that user id,
@@ -44,7 +46,7 @@ const ENROLMENT_WITH_COURSE_SELECT = {
 
 type EnrolmentRow = Prisma.EnrolmentGetPayload<{ select: typeof ENROLMENT_WITH_COURSE_SELECT }>;
 
-function toEnrolmentDto(row: EnrolmentRow): EnrolmentDto {
+function toEnrolmentDto(row: EnrolmentRow, completedLessons: number | null): EnrolmentDto {
   return {
     id: row.id,
     courseId: row.courseId,
@@ -66,6 +68,25 @@ function toEnrolmentDto(row: EnrolmentRow): EnrolmentDto {
       categoryName: row.course.category.name,
       categorySlug: row.course.category.slug,
     },
+    progress: toEnrolmentProgress(row, completedLessons),
+  };
+}
+
+/**
+ * Phase 8 read-model extension: ACTIVE/COMPLETED enrolments carry a progress
+ * block computed from ONE grouped LessonProgress count; REVOKED enrolments no
+ * longer represent a learning journey, so theirs is null. The denominator is
+ * the already-selected denormalized course.totalLessons (no extra query).
+ */
+function toEnrolmentProgress(
+  row: EnrolmentRow,
+  completedLessons: number | null,
+): EnrolmentProgressDto | null {
+  if (completedLessons === null) return null;
+  return {
+    completedLessons,
+    totalLessons: row.course.totalLessons,
+    progressPercent: computeProgressPercent(completedLessons, row.course.totalLessons),
   };
 }
 
@@ -109,7 +130,7 @@ export async function enrollInFreeCourse(userId: string, slug: string, requestId
     select: ENROLMENT_WITH_COURSE_SELECT,
   });
   if (existing && existing.status !== EnrolmentStatus.REVOKED) {
-    return toEnrolmentDto(existing);
+    return toEnrolmentDto(existing, await countCompletedLessons(userId, course.id));
   }
 
   const enrolment = await withTransaction(async (tx) => {
@@ -169,7 +190,12 @@ export async function enrollInFreeCourse(userId: string, slug: string, requestId
     return created;
   });
 
-  return toEnrolmentDto(enrolment);
+  // One count decorates the enrolment response with the progress block.
+  return toEnrolmentDto(enrolment, await countCompletedLessons(userId, course.id));
+}
+
+function countCompletedLessons(userId: string, courseId: string): Promise<number> {
+  return db.lessonProgress.count({ where: { userId, courseId } });
 }
 
 /**
@@ -229,8 +255,27 @@ export async function listMyEnrolments(userId: string, input: unknown): Promise<
   const items = hasMore ? rows.slice(0, query.limit) : rows;
   const lastItem = items.at(-1);
 
+  // One grouped query decorates the page with per-course completion counts
+  // (totalLessons comes from the already-selected course summary), keeping
+  // the whole read model at 3 queries: page + total + progress groupBy.
+  const pageCourseIds = [...new Set(items.map((item) => item.courseId))];
+  const progressCounts = pageCourseIds.length
+    ? await db.lessonProgress.groupBy({
+        by: ["courseId"],
+        where: { userId, courseId: { in: pageCourseIds } },
+        _count: { _all: true },
+      })
+    : [];
+  const completedByCourse = new Map(progressCounts.map((row) => [row.courseId, row._count._all]));
+
   return {
-    items: items.map(toEnrolmentDto),
+    items: items.map((row) =>
+      toEnrolmentDto(
+        row,
+        // REVOKED enrolments carry no progress block (null completedLessons).
+        row.status === EnrolmentStatus.REVOKED ? null : completedByCourse.get(row.courseId) ?? 0,
+      ),
+    ),
     nextCursor:
       hasMore && lastItem
         ? encodeCursor({ createdAt: lastItem.createdAt.toISOString(), id: lastItem.id })
