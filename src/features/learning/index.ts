@@ -1,5 +1,7 @@
-// Enrolment API wrappers (client-safe fetch helpers over apiRequest).
+// Student feature barrel: client-safe API wrappers + mounted page components.
 export * from "@/features/learning/api";
+export * from "@/features/learning/assessments-api";
+export * from "@/features/learning/certificates-api";
 
 export { default as StudentDashboardPage } from "@/components/prototype/pages/student/StudentDashboard";
 export { default as MyLearningPage } from "@/components/prototype/pages/student/MyLearningPage";

@@ -208,6 +208,14 @@ export const quizAttemptResultSchema = z.object({
   questions: z.array(quizAttemptResultQuestionSchema),
 });
 
+/**
+ * An in-flight attempt as served to the learner (start/resume payload and the
+ * quiz view's activeAttempt share this shape). Questions come from the
+ * attempt's snapshot, sanitized.
+ */
+export const quizActiveAttemptSchema = quizLearnerViewSchema.shape.myState.shape.activeAttempt;
+export type QuizActiveAttemptDto = NonNullable<z.infer<typeof quizActiveAttemptSchema>>;
+
 // ---------------------------------------------------------------------------
 // Learner assignment contracts
 // ---------------------------------------------------------------------------
