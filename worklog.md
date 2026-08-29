@@ -371,3 +371,26 @@ Stage Summary:
 - Phase 6 milestone 1 complete: schema + seed (8-a), catalog API (8-b), authoring API (8-c), public frontend (8-d), owner frontend (8-e), integration fix + E2E (8-f)
 - All quality gates pass: typecheck clean, lint clean, 53/53 unit tests
 - Known dev-only quirks: sandbox injects SQLite DATABASE_URL (export Postgres URL for server/tests); verification emails need SMTP; Radix aria-controls hydration warning upstream
+
+---
+Task ID: 9
+Agent: main-coordinator
+Task: Integrate the real production environment (.env) - Neon Postgres, SMTP, R2, real owner identity - and re-verify the platform end to end
+
+Work Log:
+- Merged the user-provided .env verbatim (Neon pooled DATABASE_URL + direct DIRECT_URL + separate TEST_DATABASE_URL, real Gmail SMTP, Cloudflare R2 credentials, BETTER_AUTH_SECRET/RATE_LIMIT_SALT, ALLOW_OWNER_BOOTSTRAP=false, OWNER_EMAIL=kosokodaniel@gmail.com, OWNER_DISPLAY_NAME=Oluwagbenga); documented the sandbox env-injection quirk as a comment in .env itself (.env is gitignored, secrets never committed)
+- Removed the accidental garbage-named migration `20260829112859_workspace_agent_exit_code_printf...` (only contained `DROP INDEX "Course_title_trgm_idx"`) BEFORE deploying; commit e275ab5. Root cause: a stray `prisma db push` synced the unmodeled pg_trgm GIN index out of the local DB, then `migrate dev` recorded the drop with a polluted name. Standing rule: this schema has raw-SQL indexes Prisma cannot model, so `db push` is forbidden - migrations only
+- `prisma migrate deploy` against Neon: courses_domain applied (foundation/authentication/account_issuer were already recorded); verified `channel_binding=require` in Neon URLs works with Prisma 6 without modification. DB was empty (0 users/categories/courses)
+- Provisioned the real owner via one-off `ALLOW_OWNER_BOOTSTRAP=true bun run owner:bootstrap` (the .env itself keeps bootstrap disabled for the running app): owner fdf0d440, kosokodaniel@gmail.com, emailVerified=true
+- Seeded Neon: 5 categories, 6 published courses attributed to the real owner
+- Restarted the dev server with explicit Neon DATABASE_URL/DIRECT_URL exports (sandbox injects SQLite otherwise); /api/v1/health/live and /ready both 200
+- Browser E2E against Neon: homepage featured grid + category counts real (Web Dev 3, Data Science 1, Mobile 1, DevOps & Cloud 0, Design 1); /courses shows 6 of 6; /courses/react-native-mobile-dev renders curriculum/requirements/instructor; owner login with the real password lands on /owner; /owner/courses lists Neon courses with correct prices/statuses
+- E2E exposed a UX gap: sign-in always redirected to /dashboard (prototype student view with mock "John" data) regardless of role. Fixed in commit 261a72a: login falls back by session role (OWNER -> /owner), safeRedirectPath now returns null for absent/unsafe paths (unit test updated), and /dashboard redirects owners server-side via a request-memoized requireAuthenticatedUserCached so layout+page share ONE session lookup (zero extra queries)
+- Quality gates: bun run lint clean, tsc --noEmit clean, bun test tests/unit 53/53 (auth.test.ts requires the Postgres DATABASE_URL exported in the shell per the known sandbox quirk); browser-verified owner -> /dashboard bounce to /owner and unauthenticated /dashboard -> /login; mobile 390px layout + footer push-down verified
+
+Stage Summary:
+- The platform now runs entirely on the user's real Neon Postgres with real owner credentials; local sandbox Postgres (.pg, port 5433) is retired as primary (kept on disk only)
+- Dev-server/CLI runbook: always `export DATABASE_URL=<Neon pooled> DIRECT_URL=<Neon direct>` before bun/prisma/next commands
+- SMTP is live-configured, so registration/verification emails will actually send from kosokodaniel@gmail.com from now on; owner login does not depend on it (pre-verified)
+- Seed data is deterministic and idempotent - safe to re-run with `bun run db:seed` against Neon (NODE_ENV=development guard only blocks production)
+- Login redirect contract: safeRedirectPath -> null means "no safe returnTo", caller picks role fallback; /dashboard is student-only server-side
