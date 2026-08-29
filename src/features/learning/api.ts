@@ -5,6 +5,11 @@ import {
   type EnrolmentDto,
   type PaginatedEnrolmentsDto,
 } from "@/contracts/enrolments";
+import type {
+  CheckoutSessionDto,
+  OrderStatusDto,
+  ReconcileOrderRequest,
+} from "@/contracts/payments";
 import { apiRequest } from "@/lib/client/api-client";
 
 const LEARNING_BASE_PATH = "/api/v1";
@@ -57,4 +62,45 @@ export async function enrollInCourse(slug: string): Promise<EnrolmentDto> {
     { method: "POST" },
   );
   return payload.enrolment;
+}
+
+/**
+ * POST /api/v1/courses/{slug}/checkout — creates a hosted-checkout session for
+ * a paid course (fails closed with 503 PAYMENT_PROVIDER_NOT_CONFIGURED when no
+ * provider keys are configured). Unwraps the `{ session }` envelope; the caller
+ * redirects the browser to `session.checkoutUrl`.
+ */
+export async function startCheckout(slug: string): Promise<CheckoutSessionDto> {
+  const payload = await apiRequest<{ session: CheckoutSessionDto }>(
+    `${LEARNING_BASE_PATH}/courses/${encodeURIComponent(slug)}/checkout`,
+    { method: "POST" },
+  );
+  return payload.session;
+}
+
+/**
+ * GET /api/v1/payments/orders/{orderId} — server-side order status read model,
+ * used to re-check a return-from-checkout order without trusting the query.
+ */
+export async function fetchOrderStatus(orderId: string): Promise<OrderStatusDto> {
+  const payload = await apiRequest<{ order: OrderStatusDto }>(
+    `${LEARNING_BASE_PATH}/payments/orders/${encodeURIComponent(orderId)}`,
+  );
+  return payload.order;
+}
+
+/**
+ * POST /api/v1/payments/orders/{orderId}/reconcile — asks the server to verify
+ * the order against the payment provider (the redirect query is never treated
+ * as proof of payment). Unwraps the `{ order }` envelope.
+ */
+export async function reconcileOrder(
+  orderId: string,
+  input: ReconcileOrderRequest,
+): Promise<OrderStatusDto> {
+  const payload = await apiRequest<{ order: OrderStatusDto }>(
+    `${LEARNING_BASE_PATH}/payments/orders/${encodeURIComponent(orderId)}/reconcile`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return payload.order;
 }

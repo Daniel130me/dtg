@@ -1,27 +1,30 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Lock, BookOpen, BarChart3, Cloud, Code, Palette, Smartphone, Loader2 } from 'lucide-react';
+import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Lock, BookOpen, BarChart3, Cloud, Code, Palette, Smartphone, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import StarRating from '@/components/prototype/shared/StarRating';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { fetchCourseDetail } from '@/features/catalog/api';
-import { enrollInCourse, fetchCourseEnrolmentState } from '@/features/learning/api';
+import { enrollInCourse, fetchCourseEnrolmentState, reconcileOrder, startCheckout } from '@/features/learning/api';
 import { ApiClientError } from '@/lib/client/api-client';
 import { authClient } from '@/lib/client/auth-client';
 import { formatCount, formatDuration, formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
 import type { CourseDetailDto, CourseLessonDto } from '@/contracts/catalog';
-import type { CourseEnrolmentStateDto } from '@/contracts/enrolments';
+import { PAYMENT_PROVIDER_NOT_CONFIGURED, type CourseEnrolmentStateDto } from '@/contracts/enrolments';
+import { CHECKOUT_RETURN_PARAM, type OrderStatusDto } from '@/contracts/payments';
 
 type DetailLessonType = CourseLessonDto['type'];
+
+/** Sidebar status panel shown after returning from the hosted checkout. */
+type ReconcileOutcome = 'pending' | 'failed' | 'refunded';
 
 const lessonIconMap: Record<DetailLessonType, React.ReactNode> = {
   'VIDEO': <PlayCircle className='size-4 text-primary' />,
@@ -56,6 +59,19 @@ const categoryIconMap: Record<string, React.ReactNode> = {
 };
 
 const DEFAULT_GRADIENT = 'from-[#1d4ed8] to-[#0a1a3e]';
+
+/**
+ * Flutterwave redirects back with `transaction_id=<number>` alongside
+ * `?checkout={orderId}` (see reconcileOrderRequestSchema in contracts/payments).
+ */
+const TRANSACTION_ID_PARAM = 'transaction_id';
+
+/** Parses the redirect's `transaction_id` query value; absent/invalid → undefined. */
+function parseTransactionIdParam(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
 
 function DetailSkeleton() {
   return (
@@ -142,7 +158,11 @@ export default function CourseDetailPage() {
 
   const [enrolmentState, setEnrolmentState] = useState<CourseEnrolmentStateDto | null>(null);
   const [enrolling, setEnrolling] = useState(false);
+  const [startingCheckout, setStartingCheckout] = useState(false);
   const [enrolmentLoadedKey, setEnrolmentLoadedKey] = useState<string | null>(null);
+  // Order ids this page instance already reconciled. Lives above the probe
+  // effect because the probe yields its enrolment write to this flow (below).
+  const reconciledOrderIdsRef = useRef<Set<string>>(new Set());
   // Keyed by user so switching accounts re-probes; "signed-out" settles instantly.
   const enrolmentRequestKey = signedInUserId ? `enrol:${signedInUserId}:${slug}` : 'signed-out';
   // Only meaningful while signed in; the CTA renders after the course detail settles.
@@ -156,7 +176,11 @@ export default function CourseDetailPage() {
     fetchCourseEnrolmentState(slug)
       .then((state) => {
         if (cancelled) return;
-        setEnrolmentState(state);
+        // On a checkout-return visit the reconciliation effect owns the
+        // enrolment state (its PAID branch re-probes); skip writing so a slow
+        // not-enrolled probe result can't clobber the freshly-probed enrolled
+        // state. Empty ref = no checkout-return flow = behave exactly as before.
+        if (reconciledOrderIdsRef.current.size === 0) setEnrolmentState(state);
         setEnrolmentLoadedKey(enrolmentRequestKey);
       })
       .catch((err: unknown) => {
@@ -171,6 +195,95 @@ export default function CourseDetailPage() {
       cancelled = true;
     };
   }, [signedInUserId, loading, slug, enrolmentRequestKey]);
+
+  // --- Return-from-checkout reconciliation (paid flow) ----------------------
+  // Flutterwave redirects back to /courses/{slug}?checkout={orderId}; the
+  // redirect query is NEVER trusted as proof of payment — the order is
+  // reconciled server-side before any UI claims success.
+  const [returnFlowActive, setReturnFlowActive] = useState(false);
+  const [reconcileOutcome, setReconcileOutcome] = useState<ReconcileOutcome | null>(null);
+  // Derived, never stored: a checkout return is active and the reconcile
+  // request hasn't settled yet — drives the "Verifying your payment…" panel.
+  const reconciling = returnFlowActive && reconcileOutcome === null;
+
+  // Applies a reconciled order to the UI. Shared by the automatic
+  // post-redirect check and the manual "Refresh status" retry.
+  const settleReconciledOrder = useCallback(
+    async (order: OrderStatusDto) => {
+      if (order.status === 'PAID') {
+        // Re-probe enrolment so the existing enrolled branch renders — the
+        // fulfilled enrolment is what grants access, not the order itself.
+        const state = await fetchCourseEnrolmentState(slug);
+        setEnrolmentState(state);
+        setReturnFlowActive(false);
+        toast.success("Payment confirmed — you're enrolled");
+        // Strip the return params so refreshing can't re-reconcile.
+        router.replace(`/courses/${slug}`, { scroll: false });
+        return;
+      }
+      if (order.status === 'PENDING') {
+        // Recoverable: keep the checkout params in the URL so the manual
+        // "Refresh status" retry can re-read the order id.
+        setReconcileOutcome('pending');
+        return;
+      }
+      if (order.status === 'REFUNDED') {
+        setReconcileOutcome('refunded');
+        router.replace(`/courses/${slug}`, { scroll: false });
+        return;
+      }
+      // FAILED / CANCELLED: the payment will not grant access — restore the
+      // normal purchase CTA and clean the URL.
+      setReconcileOutcome('failed');
+      router.replace(`/courses/${slug}`, { scroll: false });
+    },
+    [slug, router],
+  );
+
+  // Runs one reconciliation round and maps every failure to its panel state.
+  const runReconcile = useCallback(
+    async (orderId: string, transactionId: number | undefined) => {
+      try {
+        const order = await reconcileOrder(orderId, { transactionId });
+        await settleReconciledOrder(order);
+      } catch (err: unknown) {
+        if (err instanceof ApiClientError && err.status === 404) {
+          // Ownership edge (someone else's order / stale link): silently fall
+          // back to the normal CTA instead of showing a scary error.
+          setReturnFlowActive(false);
+          router.replace(`/courses/${slug}`, { scroll: false });
+          return;
+        }
+        // Network/5xx: the outcome is genuinely unknown — treat it like the
+        // pending state (recoverable) and surface the error honestly.
+        setReconcileOutcome('pending');
+        toast.error(err instanceof Error ? err.message : 'Payment verification failed. Please try again.');
+      }
+    },
+    [settleReconciledOrder, router, slug],
+  );
+
+  useEffect(() => {
+    // Reconcile only once the session AND the course detail have settled.
+    if (!signedInUserId || loading) return;
+
+    // window.location.search is read here instead of useSearchParams() — that
+    // hook would force a Suspense boundary, and reading inside the effect keeps
+    // every setState in async callbacks (react-hooks/set-state-in-effect).
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get(CHECKOUT_RETURN_PARAM);
+    if (!orderId) return;
+    if (reconciledOrderIdsRef.current.has(orderId)) return;
+    reconciledOrderIdsRef.current.add(orderId);
+
+    // No `cancelled` guard on purpose: StrictMode remounts the same instance
+    // (state/refs persist), and the ref claim above is what prevents a second
+    // request. A late result after a real unmount is a harmless no-op.
+    void (async () => {
+      setReturnFlowActive(true); // shows the derived "Verifying your payment…" panel
+      await runReconcile(orderId, parseTransactionIdParam(params.get(TRANSACTION_ID_PARAM)));
+    })();
+  }, [signedInUserId, loading, slug, runReconcile]);
 
   const returnToPath = `/courses/${encodeURIComponent(slug)}`;
   const loginWithReturnTo = `/login?returnTo=${encodeURIComponent(returnToPath)}`;
@@ -193,6 +306,45 @@ export default function CourseDetailPage() {
     } finally {
       setEnrolling(false);
     }
+  };
+
+  // Paid course: create a hosted-checkout session and leave the app entirely —
+  // Flutterwave redirects back to this page with ?checkout={orderId}.
+  const handleStartCheckout = async () => {
+    if (startingCheckout) return;
+    setStartingCheckout(true);
+    try {
+      const checkout = await startCheckout(slug);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        if (err.code === PAYMENT_PROVIDER_NOT_CONFIGURED) {
+          // No provider keys configured — degrade gracefully.
+          toast.error('Paid enrolment is not available yet. Free courses can be enrolled in directly.');
+        } else if (err.status === 401) {
+          // Session expired mid-flight — finish the purchase after sign-in.
+          router.push(loginWithReturnTo);
+          return;
+        } else {
+          toast.error(err.message);
+        }
+      } else {
+        toast.error('Checkout could not be started. Please try again.');
+      }
+    } finally {
+      setStartingCheckout(false);
+    }
+  };
+
+  // Manual retry for the recoverable pending state: the checkout param is kept
+  // in the URL for exactly this path, so re-read it here.
+  const handleRefreshReconcile = () => {
+    if (reconciling) return;
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get(CHECKOUT_RETURN_PARAM);
+    if (!orderId) return;
+    setReconcileOutcome(null); // panel flips back to the verifying spinner
+    void runReconcile(orderId, parseTransactionIdParam(params.get(TRANSACTION_ID_PARAM)));
   };
 
   if (loading) return <DetailSkeleton />;
@@ -299,6 +451,36 @@ export default function CourseDetailPage() {
                 </div>
                 <p className='text-xs text-muted-foreground mb-5'>30-day money-back guarantee</p>
 
+                {/* Return-from-checkout status panel (paid-flow reconciliation). */}
+                {reconciling ? (
+                  <div className='mb-5 flex items-center gap-2 rounded-lg bg-muted px-3 py-2.5 text-sm text-muted-foreground'>
+                    <Loader2 className='size-4 shrink-0 animate-spin' />
+                    Verifying your payment&hellip;
+                  </div>
+                ) : reconcileOutcome === 'pending' ? (
+                  /* Recoverable: provider hasn't confirmed yet (or verification
+                     failed) — keep the checkout params for the manual retry. */
+                  <div className='mb-5 space-y-2.5 rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400'>
+                    <p className='flex items-start gap-2'>
+                      <Clock className='mt-0.5 size-4 shrink-0' />
+                      Your payment is still processing. Your access will appear here automatically once the provider confirms it — no action needed.
+                    </p>
+                    <Button variant='outline' size='sm' className='gap-1.5' onClick={handleRefreshReconcile} disabled={reconciling}>
+                      <RefreshCw className='size-3.5' /> Refresh status
+                    </Button>
+                  </div>
+                ) : reconcileOutcome === 'failed' ? (
+                  <div className='mb-5 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive'>
+                    <AlertCircle className='mt-0.5 size-4 shrink-0' />
+                    The payment didn&apos;t go through. You can try again.
+                  </div>
+                ) : reconcileOutcome === 'refunded' ? (
+                  <div className='mb-5 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400'>
+                    <AlertCircle className='mt-0.5 size-4 shrink-0' />
+                    This payment was refunded.
+                  </div>
+                ) : null}
+
                 {/* Enrolment CTA — driven by session + enrolment state (Phase 7). */}
                 {enrolmentState?.enrolled ? (
                   <div className='space-y-3'>
@@ -337,17 +519,17 @@ export default function CourseDetailPage() {
                     )}
                   </Button>
                 ) : (
-                  /* Signed in + paid course: checkout/payments land in a later phase. */
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className='block w-full cursor-not-allowed'>
-                        <Button className='w-full' size='lg' disabled>
-                          Enroll Now
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>Paid enrolment is coming soon</TooltipContent>
-                  </Tooltip>
+                  /* Signed in + paid course: hosted Flutterwave checkout —
+                     full-page redirect to the provider's payment page. */
+                  <Button className='w-full' size='lg' onClick={handleStartCheckout} disabled={startingCheckout}>
+                    {startingCheckout ? (
+                      <>
+                        <Loader2 className='size-4 animate-spin' /> Redirecting&hellip;
+                      </>
+                    ) : (
+                      'Enroll Now'
+                    )}
+                  </Button>
                 )}
 
                 <p className='text-center text-xs text-muted-foreground mt-3'>Includes {course.totalSections} sections &middot; {course.totalLessons} lessons</p>
