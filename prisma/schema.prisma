@@ -19,6 +19,30 @@ enum UserRole {
   OWNER
 }
 
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  QUIZ
+  ASSIGNMENT
+}
+
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum UserStatus {
   ACTIVE
   SUSPENDED
@@ -54,6 +78,7 @@ model User {
   sessions        Session[]
   auditLogs       AuditLog[]        @relation("AuditActor")
   ownedPlatform   PlatformSettings? @relation("PlatformOwner")
+  createdCourses  Course[]          @relation("CourseCreator")
 
   @@index([status, createdAt, id])
 }
@@ -194,4 +219,126 @@ model RateLimitBucket {
 
   @@unique([key, windowStart])
   @@index([expiresAt])
+}
+
+model Category {
+  id        String         @id @default(uuid()) @db.Uuid
+  slug      String         @unique @db.VarChar(120)
+  name      String         @db.VarChar(120)
+  icon      String         @db.VarChar(60)
+  status    CategoryStatus @default(ACTIVE)
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  courses   Course[]
+
+  @@index([status, sortOrder])
+}
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Course {
+  id               String       @id @default(uuid()) @db.Uuid
+  slug             String       @unique @db.VarChar(160)
+  title            String       @db.VarChar(200)
+  shortDescription String       @db.VarChar(320)
+  description      String       @db.VarChar(6000)
+  thumbnailUrl     String?      @db.VarChar(2048)
+  categoryId       String       @db.Uuid
+  creatorUserId    String       @db.Uuid
+  level            CourseLevel
+  language         String       @default("English") @db.VarChar(32)
+  // Money uses integer minor units; a zero price marks the course free.
+  priceMinor       Int
+  currency         String       @default("USD") @db.VarChar(3)
+  status           CourseStatus @default(DRAFT)
+  version          Int          @default(1)
+  // Denormalized aggregates: course totals are maintained transactionally by
+  // the authoring service; enrolment/rating counters are owned by their
+  // respective phases and seeded only as deterministic demo data.
+  totalSections    Int          @default(0)
+  totalLessons     Int          @default(0)
+  totalMinutes     Int          @default(0)
+  enrollmentCount  Int          @default(0)
+  ratingAverage    Decimal?     @db.Decimal(3, 2)
+  ratingCount      Int          @default(0)
+  publishedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  category     Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  creator      User                @relation("CourseCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  sections     CourseSection[]
+  requirements CourseRequirement[]
+  outcomes     CourseOutcome[]
+
+  @@index([status, publishedAt, id])
+  @@index([categoryId, status])
+  @@index([status, updatedAt, id])
+  @@index([creatorUserId, status, updatedAt])
+}
+
+model CourseSection {
+  id        String   @id @default(uuid()) @db.Uuid
+  courseId  String   @db.Uuid
+  title     String   @db.VarChar(200)
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@unique([courseId, position])
+  @@index([courseId, createdAt])
+}
+
+model Lesson {
+  id              String       @id @default(uuid()) @db.Uuid
+  sectionId       String       @db.Uuid
+  // courseId is denormalized from the section to power unique position
+  // constraints and access checks without joining through sections.
+  courseId        String       @db.Uuid
+  title           String       @db.VarChar(200)
+  type            LessonType
+  status          LessonStatus @default(DRAFT)
+  position        Int
+  durationSeconds Int          @default(0)
+  isPreview       Boolean      @default(false)
+  // Text-lesson body (Markdown). Video lessons reference media in a later phase.
+  content         String?      @db.VarChar(20000)
+  videoUrl        String?      @db.VarChar(2048)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, position])
+  @@index([courseId, status, position])
+  @@index([sectionId, createdAt])
+}
+
+model CourseRequirement {
+  id       String @id @default(uuid()) @db.Uuid
+  courseId String @db.Uuid
+  position Int
+  text     String @db.VarChar(300)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, position])
+}
+
+model CourseOutcome {
+  id       String @id @default(uuid()) @db.Uuid
+  courseId String @db.Uuid
+  position Int
+  text     String @db.VarChar(300)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, position])
 }
