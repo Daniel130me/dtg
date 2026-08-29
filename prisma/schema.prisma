@@ -118,9 +118,13 @@ model User {
   sessions        Session[]
   auditLogs       AuditLog[]        @relation("AuditActor")
   ownedPlatform   PlatformSettings? @relation("PlatformOwner")
-  createdCourses  Course[]          @relation("CourseCreator")
-  enrolments      Enrolment[]
-  orders          Order[]
+  createdCourses    Course[]            @relation("CourseCreator")
+  enrolments        Enrolment[]
+  orders            Order[]
+  lessonProgress    LessonProgress[]
+  lessonNotes       LessonNote[]
+  discussionThreads DiscussionThread[]
+  discussionPosts   DiscussionPost[]
 
   @@index([status, createdAt, id])
 }
@@ -316,8 +320,11 @@ model Course {
   sections     CourseSection[]
   requirements CourseRequirement[]
   outcomes     CourseOutcome[]
-  enrolments   Enrolment[]
-  orderItems   OrderItem[]
+  enrolments      Enrolment[]
+  orderItems      OrderItem[]
+  lessonProgress  LessonProgress[]
+  lessonNotes     LessonNote[]
+  discussions     DiscussionThread[]
 
   @@index([status, publishedAt, id])
   @@index([categoryId, status])
@@ -359,6 +366,10 @@ model Lesson {
   updatedAt       DateTime     @updatedAt
 
   section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  progress LessonProgress[]
+  notes    LessonNote[]
+  threads  DiscussionThread[]
 
   @@unique([sectionId, position])
   @@index([courseId, status, position])
@@ -511,4 +522,96 @@ model WebhookEvent {
 
   @@unique([provider, providerRef])
   @@index([status, receivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Learner state (Phase 8): durable progress, private notes, lesson Q&A.
+//
+// courseId is denormalized onto every learner-state row so dashboards and
+// progress percentages aggregate per course without joining through lessons.
+// Moderation is a plain status enum shared by threads and posts: a HIDDEN row
+// stays in the database for the audit trail but is excluded from learner reads.
+// ---------------------------------------------------------------------------
+
+enum DiscussionStatus {
+  ACTIVE
+  HIDDEN
+}
+
+/// One row per completed lesson per learner. The row itself is the completion
+/// (monotonic: completions never regress), so repeats are idempotent via the
+/// unique constraint.
+model LessonProgress {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  lessonId    String   @db.Uuid
+  // Denormalized from the lesson for per-course aggregation.
+  courseId    String   @db.Uuid
+  completedAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, courseId, completedAt])
+  @@index([courseId])
+}
+
+/// One private, editable note per learner per lesson.
+model LessonNote {
+  id       String   @id @default(uuid()) @db.Uuid
+  userId   String   @db.Uuid
+  lessonId String   @db.Uuid
+  // Denormalized from the lesson for the all-notes export.
+  courseId String   @db.Uuid
+  body     String   @db.VarChar(5000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, updatedAt])
+}
+
+/// A learner question on a lesson; replies live in DiscussionPost.
+model DiscussionThread {
+  id             String           @id @default(uuid()) @db.Uuid
+  lessonId       String           @db.Uuid
+  // Denormalized for per-course moderation reads.
+  courseId       String           @db.Uuid
+  userId         String           @db.Uuid
+  title          String           @db.VarChar(200)
+  status         DiscussionStatus @default(ACTIVE)
+  // Denormalized reply count maintained transactionally by the replies service.
+  postCount      Int              @default(0)
+  lastActivityAt DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts  DiscussionPost[]
+
+  @@index([lessonId, status, lastActivityAt])
+  @@index([courseId, status, lastActivityAt])
+}
+
+/// A reply (or follow-up) inside a discussion thread.
+model DiscussionPost {
+  id        String           @id @default(uuid()) @db.Uuid
+  threadId  String           @db.Uuid
+  userId    String           @db.Uuid
+  body      String           @db.VarChar(5000)
+  status    DiscussionStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+
+  thread DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, status, createdAt])
 }
