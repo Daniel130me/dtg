@@ -7,9 +7,12 @@ async function main(): Promise<void> {
 
   const email = process.env.OWNER_EMAIL;
   const displayName = process.env.OWNER_DISPLAY_NAME;
-  if (!email || !displayName) throw new Error("OWNER_EMAIL and OWNER_DISPLAY_NAME are required.");
+  const password = process.env.OWNER_PASSWORD;
+  if (!email || !displayName || !password) {
+    throw new Error("OWNER_EMAIL, OWNER_DISPLAY_NAME, and OWNER_PASSWORD are required.");
+  }
 
-  const owner = await provisionInitialOwner({ email, displayName });
+  const owner = await provisionInitialOwner({ email, displayName, password });
   console.info(`Owner provisioned with id ${owner.id}.`);
 }
 

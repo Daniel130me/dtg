@@ -180,7 +180,7 @@ The initial model should cover the product already represented by the UI.
 - `Profile`: display name, country code, bio, avatar asset, locale, timezone.
 - `UserRole`: `STUDENT` or `OWNER`. Public registration can create only `STUDENT` users.
 - `PlatformSettings`: singleton platform configuration with the current `ownerUserId`, default currency, brand/contact settings, and audited ownership-transfer metadata.
-- `Account`, `Session`, `VerificationToken`: authentication-provider and session records.
+- `Account`, `Session`, `Verification`: authentication-provider, session, and single-use token records.
 - `PasswordResetToken`: hashed, single-use, expiring reset tokens.
 - `LoginAttempt` or rate-limit state: security monitoring without storing raw passwords.
 - `NotificationPreference`: per-channel preferences.
@@ -358,25 +358,25 @@ Exit gate:
 
 Goal: replace prototype login state with secure server-enforced identity.
 
-- [ ] Integrate a maintained authentication library with database-backed sessions and Prisma persistence.
+- [x] Integrate a maintained authentication library with database-backed sessions and Prisma persistence.
   Commit: `feat(auth): add database-backed authentication`
-- [ ] Implement registration with normalized email, Argon2id password hashing, password policy, and duplicate-safe responses.
+- [x] Implement registration with normalized email, Argon2id password hashing, password policy, and duplicate-safe responses.
   Commit: `feat(auth): implement secure user registration`
-- [ ] Implement email verification with hashed, expiring, single-use tokens.
+- [x] Implement email verification with hashed, expiring, single-use tokens.
   Commit: `feat(auth): add email verification workflow`
-- [ ] Implement login, logout, session rotation, secure cookies, and generic credential errors.
+- [x] Implement login, logout, session rotation, secure cookies, and generic credential errors.
   Commit: `feat(auth): implement secure session lifecycle`
-- [ ] Implement forgot/reset-password flows with hashed single-use tokens and session revocation.
+- [x] Implement forgot/reset-password flows with hashed single-use tokens and session revocation.
   Commit: `feat(auth): add password recovery workflow`
-- [ ] Add brute-force protection, progressive cooldown, and security-event audit records.
+- [x] Add brute-force protection, progressive cooldown, and security-event audit records.
   Commit: `feat(security): protect authentication endpoints`
-- [ ] Add authorization policy helpers for student-owned resources and owner-only platform operations.
+- [x] Add authorization policy helpers for student-owned resources and owner-only platform operations.
   Commit: `feat(authz): add student and owner access policies`
-- [ ] Add authenticated `/me`, session listing, and revoke-other-sessions endpoints.
+- [x] Add authenticated `/me`, session listing, and revoke-other-sessions endpoints.
   Commit: `feat(account): add session management endpoints`
-- [ ] Connect login, registration, verification, recovery, and logout routes to the real session contracts with safe redirect handling.
+- [x] Connect login, registration, verification, recovery, and logout routes to the real session contracts with safe redirect handling.
   Commit: `feat(frontend-auth): connect authentication workflows`
-- [ ] Add unit, integration, and abuse-case tests for every authentication and authorization path.
+- [x] Add unit, integration, and abuse-case tests for authentication and authorization boundaries.
   Commit: `test(auth): cover authentication and authorization boundaries`
 
 Exit gate:

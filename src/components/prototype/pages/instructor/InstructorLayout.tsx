@@ -16,7 +16,6 @@ import {
 import { useNav } from '@/lib/prototype/navigation';
 import type { ViewName } from '@/lib/prototype/types';
 import { cn } from '@/lib/utils';
-import { instructor } from '@/lib/prototype/mock-data';
 
 interface NavItem {
   label: string;
@@ -43,7 +42,8 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
-  const { navigate, logout } = useNav();
+  const { navigate, logout, userName } = useNav();
+  const ownerName = userName || 'Platform Owner';
 
   const handleNav = (view: ViewName) => {
     navigate(view);
@@ -69,10 +69,10 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm shrink-0">
-            {instructor.name.split(' ').map(n => n[0]).join('')}
+            {ownerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{instructor.name}</p>
+            <p className="text-sm font-semibold truncate">{ownerName}</p>
             <p className="text-xs text-background/60">Platform Owner</p>
           </div>
         </div>

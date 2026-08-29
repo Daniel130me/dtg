@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
+import { authClient } from '@/lib/client/auth-client';
 import type { ViewName } from './types';
 
 interface NavigationState {
@@ -10,13 +11,13 @@ interface NavigationState {
   viewParams: Record<string, string>;
   isAuthenticated: boolean;
   userRole: 'student' | 'owner';
+  userName: string | null;
 }
 
 interface NavigationContextType extends NavigationState {
   navigate: (view: ViewName, params?: Record<string, string>) => void;
   goBack: () => void;
-  login: (role?: 'student' | 'owner') => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const VIEW_ROUTES: Record<ViewName, string> = {
@@ -77,12 +78,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const routeParams = useParams<Record<string, string | string[]>>();
   const currentView = resolveView(pathname);
+  const { data: session } = authClient.useSession();
   const [previousView, setPreviousView] = useState<ViewName | null>(null);
-  // Temporary until Phase 3 replaces prototype authentication with server sessions.
-  const [authState, setAuthState] = useState<Pick<NavigationState, 'isAuthenticated' | 'userRole'>>({
-    isAuthenticated: false,
-    userRole: 'student',
-  });
+  const userRole = (session?.user as { role?: string } | undefined)?.role === 'OWNER' ? 'owner' : 'student';
 
   const viewParams = useMemo(
     () => Object.fromEntries(
@@ -98,19 +96,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const goBack = useCallback(() => router.back(), [router]);
 
-  const login = useCallback((role: 'student' | 'owner' = 'student') => {
-    setAuthState({ isAuthenticated: true, userRole: role });
-    router.replace(role === 'owner' ? '/owner' : '/dashboard');
-  }, [router]);
-
-  const logout = useCallback(() => {
-    setAuthState({ isAuthenticated: false, userRole: 'student' });
+  const logout = useCallback(async () => {
+    await authClient.signOut();
+    router.refresh();
     router.replace('/');
   }, [router]);
 
   return (
     <NavigationContext.Provider
-      value={{ currentView, previousView, viewParams, ...authState, navigate, goBack, login, logout }}
+      value={{ currentView, previousView, viewParams, isAuthenticated: Boolean(session), userRole, userName: session?.user.name ?? null, navigate, goBack, logout }}
     >
       {children}
     </NavigationContext.Provider>

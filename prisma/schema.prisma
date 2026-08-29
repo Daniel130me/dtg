@@ -38,22 +38,22 @@ enum OutboxStatus {
 }
 
 model User {
-  id                  String               @id @default(uuid()) @db.Uuid
-  email               String               @db.VarChar(320)
-  emailNormalized     String               @unique @db.VarChar(320)
-  passwordHash        String?              @db.VarChar(255)
-  role                UserRole             @default(STUDENT)
-  status              UserStatus           @default(ACTIVE)
-  emailVerifiedAt     DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  deletedAt           DateTime?
-  profile             Profile?
-  accounts            Account[]
-  sessions            Session[]
-  passwordResetTokens PasswordResetToken[]
-  auditLogs           AuditLog[]           @relation("AuditActor")
-  ownedPlatform       PlatformSettings?    @relation("PlatformOwner")
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String            @db.VarChar(120)
+  email           String            @unique @db.VarChar(320)
+  emailNormalized String            @unique @db.VarChar(320)
+  emailVerified   Boolean           @default(false)
+  image           String?           @db.VarChar(2048)
+  role            UserRole          @default(STUDENT)
+  status          UserStatus        @default(ACTIVE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  profile         Profile?
+  accounts        Account[]
+  sessions        Session[]
+  auditLogs       AuditLog[]        @relation("AuditActor")
+  ownedPlatform   PlatformSettings? @relation("PlatformOwner")
 
   @@index([status, createdAt, id])
 }
@@ -84,57 +84,50 @@ model PlatformSettings {
 }
 
 model Account {
-  id                String  @id @default(uuid()) @db.Uuid
-  userId            String  @db.Uuid
-  type              String  @db.VarChar(32)
-  provider          String  @db.VarChar(64)
-  providerAccountId String  @db.VarChar(255)
-  refreshToken      String? @db.Text
-  accessToken       String? @db.Text
-  expiresAt         Int?
-  tokenType         String? @db.VarChar(64)
-  scope             String? @db.Text
-  idToken           String? @db.Text
-  sessionState      String? @db.Text
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(uuid()) @db.Uuid
+  issuer                String    @db.VarChar(512)
+  accountId             String    @db.VarChar(255)
+  providerId            String    @db.VarChar(64)
+  userId                String    @db.Uuid
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?   @db.Text
+  password              String?   @db.VarChar(255)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
+  @@unique([issuer, accountId])
   @@index([userId])
 }
 
 model Session {
-  id           String   @id @default(uuid()) @db.Uuid
-  sessionToken String   @unique @db.VarChar(255)
-  userId       String   @db.Uuid
-  expires      DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, expires])
-  @@index([expires])
-}
-
-model VerificationToken {
-  identifier String   @db.VarChar(320)
-  tokenHash  String   @unique @db.VarChar(255)
-  expires    DateTime
-  createdAt  DateTime @default(now())
-
-  @@unique([identifier, tokenHash])
-  @@index([expires])
-}
-
-model PasswordResetToken {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @db.Uuid
-  tokenHash  String    @unique @db.VarChar(255)
-  expiresAt  DateTime
-  consumedAt DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique @db.VarChar(255)
+  userId    String   @db.Uuid
+  expiresAt DateTime
+  ipAddress String?  @db.VarChar(64)
+  userAgent String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String   @db.VarChar(512)
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
   @@index([expiresAt])
 }
 

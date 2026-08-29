@@ -1,4 +1,5 @@
 import { db } from "@/server/db/client";
+import { withDatabaseConnectionRetry } from "@/server/db/retry";
 import { getServerEnv } from "@/server/config/env";
 import { ApiError } from "@/server/http/errors";
 import { apiSuccess } from "@/server/http/responses";
@@ -15,7 +16,10 @@ async function assertDatabaseReady(): Promise<void> {
   });
 
   try {
-    await Promise.race([db.$queryRaw`SELECT 1`, timeoutPromise]);
+    await Promise.race([
+      withDatabaseConnectionRetry(() => db.$queryRaw`SELECT 1`),
+      timeoutPromise,
+    ]);
   } finally {
     if (timeout) clearTimeout(timeout);
   }

@@ -1,27 +1,39 @@
 'use client';
 
 import React, { useState } from 'react';
-import { GraduationCap, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { useNav } from '@/lib/prototype/navigation';
+import { authClient } from '@/lib/client/auth-client';
+import { safeRedirectPath } from '@/lib/client/safe-redirect';
 
 export default function LoginModal() {
-  const { navigate, login } = useNav();
+  const { navigate } = useNav();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login('student');
-  };
-
-  const handleOwnerLogin = () => {
-    login('owner');
+    setError(null);
+    setPending(true);
+    const result = await authClient.signIn.email({ email, password });
+    setPending(false);
+    if (result.error) {
+      setError('Email or password is incorrect, or the email is not verified.');
+      return;
+    }
+    router.replace(safeRedirectPath(searchParams.get('returnTo')));
+    router.refresh();
   };
 
   return (
@@ -52,7 +64,7 @@ export default function LoginModal() {
             <div className='space-y-2'>
               <div className='flex items-center justify-between'>
                 <Label htmlFor='login-password'>Password</Label>
-                <button type='button' className='text-xs text-primary hover:underline'>Forgot password?</button>
+                <Link href='/forgot-password' className='text-xs text-primary hover:underline'>Forgot password?</Link>
               </div>
               <div className='relative'>
                 <Input
@@ -73,19 +85,11 @@ export default function LoginModal() {
               </div>
             </div>
 
-            <Button type='submit' className='w-full' size='lg'>
-              Sign In
+            {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
+            <Button type='submit' className='w-full' size='lg' disabled={pending}>
+              {pending ? 'Signing in…' : 'Sign In'}
             </Button>
           </form>
-
-          <div className='relative my-6'>
-            <Separator />
-            <span className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground'>or</span>
-          </div>
-
-          <Button variant='outline' className='w-full' onClick={handleOwnerLogin}>
-            Owner Preview
-          </Button>
 
           <p className='text-center text-sm text-muted-foreground mt-6'>
             Don&apos;t have an account?{' '}

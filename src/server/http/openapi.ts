@@ -22,5 +22,40 @@ export const openApiDocument = {
         },
       },
     },
+    "/auth/me": {
+      get: {
+        operationId: "getCurrentUser",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Current authenticated user." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/auth/sessions": {
+      get: {
+        operationId: "listSessions",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Active sessions, excluding session tokens." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/auth/sessions/revoke-others": {
+      post: {
+        operationId: "revokeOtherSessions",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Other sessions were revoked." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+  },
+  components: {
+    securitySchemes: {
+      sessionCookie: { type: "apiKey", in: "cookie", name: "better-auth.session_token" },
+    },
   },
 } as const;

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/server/db/client";
+import { hashPassword } from "@/server/auth/password";
 import { ApiError } from "@/server/http/errors";
 import {
   provisionOwnerSchema,
@@ -10,6 +11,7 @@ import {
 
 export async function provisionInitialOwner(input: ProvisionOwnerInput) {
   const value = provisionOwnerSchema.parse(input);
+  const password = await hashPassword(value.password);
   return db.$transaction(
     async (transaction) => {
       const settings = await transaction.platformSettings.findUnique({ where: { id: "platform" } });
@@ -18,13 +20,28 @@ export async function provisionInitialOwner(input: ProvisionOwnerInput) {
       const owner = await transaction.user.upsert({
         where: { emailNormalized: value.email },
         create: {
+          name: value.displayName,
           email: value.email,
           emailNormalized: value.email,
+          emailVerified: true,
           role: "OWNER",
           profile: { create: { displayName: value.displayName } },
         },
-        update: { role: "OWNER", status: "ACTIVE" },
+        update: { name: value.displayName, role: "OWNER", status: "ACTIVE", emailVerified: true },
         select: { id: true, email: true, role: true },
+      });
+
+      await transaction.account.upsert({
+        where: { issuer_accountId: { issuer: "local:credential", accountId: owner.id } },
+        create: {
+          issuer: "local:credential",
+          accountId: owner.id,
+          providerId: "credential",
+          userId: owner.id,
+          password,
+        },
+        update: { password },
+        select: { id: true },
       });
 
       await transaction.platformSettings.create({

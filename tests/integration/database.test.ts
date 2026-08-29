@@ -34,6 +34,19 @@ describe("database integration", { skip: !testDatabaseUrl }, () => {
   });
 
   it("can execute a bounded readiness query", async () => {
-    assert.deepEqual(await database.$queryRaw`SELECT 1 AS value`, [{ value: 1 }]);
+    const { withDatabaseConnectionRetry } = await import("@/server/db/retry");
+    assert.deepEqual(
+      await withDatabaseConnectionRetry(() => database.$queryRaw`SELECT 1 AS value`),
+      [{ value: 1 }],
+    );
+  });
+
+  it("has the database-backed authentication tables and indexes", async () => {
+    const rows = await database.$queryRaw<Array<{ relation: string | null }>>`
+      SELECT to_regclass('public."Session"')::text AS relation
+      UNION ALL
+      SELECT to_regclass('public."Verification"')::text AS relation
+    `;
+    assert.deepEqual(rows.map((row) => row.relation), ['"Session"', '"Verification"']);
   });
 });

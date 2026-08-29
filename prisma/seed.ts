@@ -11,6 +11,7 @@ async function main(): Promise<void> {
     where: { emailNormalized: "student@example.test" },
     update: {},
     create: {
+      name: "Demo Student",
       email: "student@example.test",
       emailNormalized: "student@example.test",
       profile: { create: { displayName: "Demo Student", countryCode: "NG", timezone: "Africa/Lagos" } },

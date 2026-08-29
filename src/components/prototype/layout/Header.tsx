@@ -19,9 +19,15 @@ const navLinks = [
 ];
 
 export default function Header() {
-  const { currentView, navigate, isAuthenticated, userRole, logout } = useNav();
+  const { currentView, navigate, isAuthenticated, userRole, userName, logout } = useNav();
   const [mobileOpen, setMobileOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const initials = userName
+    ?.split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'U';
 
   const handleNav = (view: ViewName) => {
     navigate(view);
@@ -95,7 +101,7 @@ export default function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant='ghost' className='gap-2 pl-2 pr-3' aria-label='Open account menu'>
                     <Avatar className='size-8'>
-                      <AvatarFallback className='bg-primary/10 text-primary text-xs font-bold'>JA</AvatarFallback>
+                      <AvatarFallback className='bg-primary/10 text-primary text-xs font-bold'>{initials}</AvatarFallback>
                     </Avatar>
                     <ChevronDown className='size-3.5 text-muted-foreground' />
                   </Button>
@@ -103,7 +109,7 @@ export default function Header() {
                 <DropdownMenuContent align='end' className='w-56'>
                   <DropdownMenuLabel>
                     <div className='flex flex-col gap-0.5'>
-                      <span className='font-medium text-sm'>{userRole === 'owner' ? 'Daniel T. George' : 'John Adebayo'}</span>
+                      <span className='font-medium text-sm'>{userName}</span>
                       <span className='text-xs text-muted-foreground font-normal capitalize'>{userRole}</span>
                     </div>
                   </DropdownMenuLabel>

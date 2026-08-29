@@ -29,4 +29,22 @@ describe("server environment", () => {
       /RATE_LIMIT_SALT/,
     );
   });
+
+  it("requires a non-default authentication secret in production", () => {
+    assert.throws(
+      () => getServerEnv({
+        NODE_ENV: "production",
+        DATABASE_URL: databaseUrl,
+        RATE_LIMIT_SALT: "this-is-a-valid-production-rate-limit-salt",
+      }),
+      /BETTER_AUTH_SECRET/,
+    );
+  });
+
+  it("rejects partial SMTP configuration", () => {
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, SMTP_HOST: "smtp.example.test" }),
+      /must be configured together/,
+    );
+  });
 });

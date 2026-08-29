@@ -2,32 +2,39 @@
 
 import React, { useState } from 'react';
 import { GraduationCap, Eye, EyeOff } from 'lucide-react';
+import { authClient } from '@/lib/client/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { useNav } from '@/lib/prototype/navigation';
 
-const countries = [
-  'Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Egypt', 'Tanzania', 'Uganda',
-  'Rwanda', 'Ethiopia', 'Senegal', 'United States', 'United Kingdom', 'Canada',
-  'Germany', 'France', 'India', 'Philippines', 'Brazil', 'Other',
-];
-
 export default function RegisterModal() {
-  const { navigate, login } = useNav();
+  const { navigate } = useNav();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [country, setCountry] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    login('student');
+    setError(null);
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setPending(true);
+    const result = await authClient.signUp.email({ name: name.trim(), email, password });
+    setPending(false);
+    if (result.error) {
+      setError('Unable to create the account. Check the information and try again.');
+      return;
+    }
+    setMessage('Account created. Check your email to verify it before signing in.');
   };
 
   return (
@@ -75,6 +82,8 @@ export default function RegisterModal() {
                   placeholder='Create a password'
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  minLength={12}
+                  maxLength={128}
                   required
                 />
                 <button
@@ -85,7 +94,7 @@ export default function RegisterModal() {
                   {showPassword ? <EyeOff className='size-4' /> : <Eye className='size-4' />}
                 </button>
               </div>
-              <p className='text-xs text-muted-foreground'>Must be at least 8 characters</p>
+              <p className='text-xs text-muted-foreground'>Use 12–128 characters.</p>
             </div>
 
             <div className='space-y-2'>
@@ -96,26 +105,16 @@ export default function RegisterModal() {
                 placeholder='Confirm your password'
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={12}
+                maxLength={128}
                 required
               />
             </div>
 
-            <div className='space-y-2'>
-              <Label>Country</Label>
-              <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger className='w-full'>
-                  <SelectValue placeholder='Select your country' />
-                </SelectTrigger>
-                <SelectContent>
-                  {countries.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button type='submit' className='w-full' size='lg'>
-              Create Account
+            {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
+            {message && <p role='status' className='text-sm text-green-700'>{message}</p>}
+            <Button type='submit' className='w-full' size='lg' disabled={pending || Boolean(message)}>
+              {pending ? 'Creating account…' : 'Create Account'}
             </Button>
           </form>
 

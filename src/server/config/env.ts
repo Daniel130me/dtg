@@ -30,6 +30,7 @@ const serverEnvSchema = z
       .default("false")
       .transform((value) => value === "true"),
     RATE_LIMIT_SALT: z.string().min(16).default("development-only-rate-limit-salt"),
+    BETTER_AUTH_SECRET: z.string().min(32).default("development-only-auth-secret-change-me"),
     R2_BUCKET: optionalString,
     R2_ENDPOINT: optionalUrl,
     R2_ACCESS_KEY_ID: optionalString,
@@ -49,6 +50,27 @@ const serverEnvSchema = z
         code: "custom",
         path: ["RATE_LIMIT_SALT"],
         message: "must be set to a secret value in production",
+      });
+    }
+
+    if (
+      value.NODE_ENV === "production" &&
+      /development|replace|example|change-me/i.test(value.BETTER_AUTH_SECRET)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["BETTER_AUTH_SECRET"],
+        message: "must be set to a cryptographically random value in production",
+      });
+    }
+
+    const smtpValues = [value.EMAIL_FROM, value.SMTP_HOST, value.SMTP_USER, value.SMTP_PASSWORD];
+    const configuredSmtpValues = smtpValues.filter(Boolean).length;
+    if (configuredSmtpValues > 0 && configuredSmtpValues !== smtpValues.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["SMTP_HOST"],
+        message: "EMAIL_FROM, SMTP_HOST, SMTP_USER, and SMTP_PASSWORD must be configured together",
       });
     }
   });
