@@ -61,3 +61,4 @@ upload/
 
 # sandbox postgres (portable binaries + data)
 .pg/
+.zscripts/dev.pid
