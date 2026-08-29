@@ -104,3 +104,123 @@ export async function reconcileOrder(
   );
   return payload.order;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 8 — learner dashboard, progress, notes, and lesson Q&A.
+// ---------------------------------------------------------------------------
+
+import type {
+  replyListQuerySchema,
+  threadListQuerySchema,
+  CourseProgressDto,
+  DiscussionPostDto,
+  DiscussionThreadSummaryDto,
+  LearnerDashboardDto,
+  LessonAccessDto,
+  LessonNoteDto,
+  PaginatedThreadsDto,
+  ProgressResultDto,
+  ThreadDetailDto,
+} from "@/contracts/learning";
+
+/** GET /api/v1/learning/dashboard — stats + continue-learning rail. */
+export function fetchLearnerDashboard(): Promise<LearnerDashboardDto> {
+  return apiRequest<LearnerDashboardDto>(`${LEARNING_BASE_PATH}/learning/dashboard`);
+}
+
+/** GET /api/v1/learning/courses/{slug}/progress — curriculum + completion map. */
+export function fetchCourseProgress(slug: string): Promise<CourseProgressDto> {
+  return apiRequest<CourseProgressDto>(
+    `${LEARNING_BASE_PATH}/learning/courses/${encodeURIComponent(slug)}/progress`,
+  );
+}
+
+/** GET /api/v1/learning/lessons/{lessonId} — lesson content behind access rules. */
+export function fetchLessonAccess(lessonId: string): Promise<LessonAccessDto> {
+  return apiRequest<LessonAccessDto>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}`,
+  );
+}
+
+/**
+ * POST /api/v1/learning/lessons/{lessonId}/progress — idempotent, monotonic
+ * completion; repeats return the same course progress snapshot.
+ */
+export function markLessonComplete(lessonId: string): Promise<ProgressResultDto> {
+  return apiRequest<ProgressResultDto>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/progress`,
+    { method: "POST", body: JSON.stringify({ completed: true }) },
+  );
+}
+
+/** GET the caller's note for a lesson (`note` is null when none saved yet). */
+export function fetchLessonNote(lessonId: string): Promise<LessonNoteDto | null> {
+  return apiRequest<{ note: LessonNoteDto | null }>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/note`,
+  ).then((payload) => payload.note);
+}
+
+/** PUT the caller's note for a lesson (upsert; one note per lesson). */
+export function saveLessonNote(lessonId: string, body: string): Promise<LessonNoteDto> {
+  return apiRequest<{ note: LessonNoteDto }>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/note`,
+    { method: "PUT", body: JSON.stringify({ body }) },
+  ).then((payload) => payload.note);
+}
+
+/** DELETE the caller's note for a lesson. */
+export function deleteLessonNote(lessonId: string): Promise<void> {
+  return apiRequest<{ note: LessonNoteDto }>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/note`,
+    { method: "DELETE" },
+  ).then(() => undefined);
+}
+
+type ThreadListQueryInput = z.input<typeof threadListQuerySchema>;
+type ReplyListQueryInput = z.input<typeof replyListQuerySchema>;
+
+function buildQuerySuffix(query: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    params.set(key, String(value));
+  }
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+/** GET the lesson's question threads (newest activity first, cursor-paginated). */
+export function fetchLessonThreads(
+  lessonId: string,
+  query: ThreadListQueryInput = {},
+): Promise<PaginatedThreadsDto> {
+  return apiRequest<PaginatedThreadsDto>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/threads${buildQuerySuffix(query)}`,
+  );
+}
+
+/** POST a new question thread on a lesson. Unwraps the `{ thread }` envelope. */
+export function createLessonThread(
+  lessonId: string,
+  input: { title: string; body: string },
+): Promise<DiscussionThreadSummaryDto> {
+  return apiRequest<{ thread: DiscussionThreadSummaryDto }>(
+    `${LEARNING_BASE_PATH}/learning/lessons/${encodeURIComponent(lessonId)}/threads`,
+    { method: "POST", body: JSON.stringify(input) },
+  ).then((payload) => payload.thread);
+}
+
+/** GET one thread with its replies (cursor-paginated page one). */
+export function fetchThread(threadId: string, query: ReplyListQueryInput = {}): Promise<ThreadDetailDto> {
+  return apiRequest<ThreadDetailDto>(
+    `${LEARNING_BASE_PATH}/learning/threads/${encodeURIComponent(threadId)}${buildQuerySuffix(query)}`,
+  );
+}
+
+/** POST a reply to a thread. Unwraps the `{ post }` envelope. */
+export function replyToThread(threadId: string, body: string): Promise<DiscussionPostDto> {
+  return apiRequest<{ post: DiscussionPostDto }>(
+    `${LEARNING_BASE_PATH}/learning/threads/${encodeURIComponent(threadId)}/replies`,
+    { method: "POST", body: JSON.stringify({ body }) },
+  ).then((payload) => payload.post);
+}

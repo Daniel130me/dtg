@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { fetchMyEnrolments, type EnrolmentListQueryInput } from '@/features/learning/api';
 import { ApiClientError } from '@/lib/client/api-client';
@@ -137,6 +138,10 @@ function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
   const course = enrolment.course;
   const gradient = categoryGradients[course.categorySlug] ?? DEFAULT_GRADIENT;
   const statusBadge = statusBadgeMap[enrolment.status];
+  const progress = enrolment.progress; // nullable — see enrolmentProgressSchema
+  // Fully-watched courses switch the card's primary action from resuming to
+  // reviewing (the link target stays the course page either way).
+  const courseCompleted = progress?.progressPercent === 100;
 
   return (
     <motion.div
@@ -194,12 +199,33 @@ function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
               </span>
             </div>
 
+            {/* Per-course progress — null on freshly granted enrolments, in
+                which case only the plain meta row above renders. The
+                indicator's standard color is bg-primary, which covers both
+                cases: 100% completed bars render in primary, and in-progress
+                bars keep the same standard color. */}
+            {progress && (
+              <div className='flex flex-col gap-1.5'>
+                <Progress
+                  value={progress.progressPercent}
+                  className='h-1.5'
+                  aria-label={`${progress.progressPercent}% of this course completed`}
+                />
+                <div className='flex items-center justify-between text-xs'>
+                  <span className='text-muted-foreground'>
+                    {progress.completedLessons}/{progress.totalLessons} lessons
+                  </span>
+                  <span className='font-medium text-foreground'>{progress.progressPercent}%</span>
+                </div>
+              </div>
+            )}
+
             <div className='pt-1 border-t flex items-center justify-between'>
               <span className='text-xs text-muted-foreground'>
                 Enrolled {formatEnrolledDate(enrolment.enrolledAt)}
               </span>
               <span className='inline-flex items-center gap-1 text-xs font-medium text-primary'>
-                Continue <ArrowRight className='size-3.5' />
+                {courseCompleted ? 'Review course' : 'Continue'} <ArrowRight className='size-3.5' />
               </span>
             </div>
           </CardContent>
