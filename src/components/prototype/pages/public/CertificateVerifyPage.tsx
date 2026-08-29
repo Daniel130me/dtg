@@ -140,8 +140,8 @@ export default function CertificateVerifyPage() {
           className='w-full max-w-lg'
         >
           <Card className='overflow-hidden'>
-            {/* Issuing brand */}
-            <div className='bg-gradient-to-br from-primary to-[#0a1a3e] px-6 py-4 text-center'>
+            {/* Issuing brand (kept in the primary/emerald family — no blue) */}
+            <div className='bg-gradient-to-br from-primary to-emerald-950 px-6 py-4 text-center'>
               <p className='text-sm font-semibold text-white tracking-wide'>{payload.brandName}</p>
             </div>
 

@@ -932,22 +932,25 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         >
                           <MoveRight className="size-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          disabled={busy}
-                          onClick={() => setAssessmentLesson(lesson)}
-                          aria-label={
-                            lesson.type === 'QUIZ' ? 'Configure quiz' : 'Configure assignment'
-                          }
-                        >
-                          {lesson.type === 'QUIZ' ? (
-                            <BookOpenCheck className="size-3.5" />
-                          ) : (
-                            <FileCheck className="size-3.5" />
-                          )}
-                        </Button>
+                        {/* Assessment config only applies to QUIZ/ASSIGNMENT lessons. */}
+                        {(lesson.type === 'QUIZ' || lesson.type === 'ASSIGNMENT') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            disabled={busy}
+                            onClick={() => setAssessmentLesson(lesson)}
+                            aria-label={
+                              lesson.type === 'QUIZ' ? 'Configure quiz' : 'Configure assignment'
+                            }
+                          >
+                            {lesson.type === 'QUIZ' ? (
+                              <BookOpenCheck className="size-3.5" />
+                            ) : (
+                              <FileCheck className="size-3.5" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
