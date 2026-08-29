@@ -58,3 +58,6 @@ server.log
 tool-results/
 upload/
 .dbdata
+
+# sandbox postgres (portable binaries + data)
+.pg/

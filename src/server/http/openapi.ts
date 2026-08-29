@@ -52,6 +52,298 @@ export const openApiDocument = {
         },
       },
     },
+    "/catalog/categories": {
+      get: {
+        operationId: "listCatalogCategories",
+        responses: {
+          "200": { description: "Active categories with their published course counts." },
+        },
+      },
+    },
+    "/courses": {
+      get: {
+        operationId: "listPublishedCourses",
+        parameters: [
+          { name: "search", in: "query", schema: { type: "string", maxLength: 100 } },
+          { name: "category", in: "query", schema: { type: "string" } },
+          {
+            name: "level",
+            in: "query",
+            schema: { type: "string", enum: ["BEGINNER", "INTERMEDIATE", "ADVANCED"] },
+          },
+          {
+            name: "price",
+            in: "query",
+            schema: { type: "string", enum: ["ALL", "FREE", "PAID"], default: "ALL" },
+          },
+          {
+            name: "sort",
+            in: "query",
+            schema: {
+              type: "string",
+              enum: ["NEWEST", "POPULAR", "RATING", "PRICE_ASC", "PRICE_DESC"],
+              default: "NEWEST",
+            },
+          },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 24 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated published courses." },
+          "422": { description: "Query or cursor validation failed." },
+        },
+      },
+    },
+    "/courses/{slug}": {
+      get: {
+        operationId: "getPublishedCourseBySlug",
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Published course detail with curriculum and instructor." },
+          "404": { description: "The course does not exist or is not published." },
+          "422": { description: "Path validation failed." },
+        },
+      },
+    },
+    "/owner/courses": {
+      get: {
+        operationId: "listOwnerCourses",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string", enum: ["DRAFT", "PUBLISHED", "ARCHIVED"] } },
+          { name: "search", in: "query", schema: { type: "string" } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated owner course list." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+      post: {
+        operationId: "createCourse",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "201": { description: "Course created as a draft." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Invalid course fields or inactive category." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}": {
+      get: {
+        operationId: "getOwnerCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "expectedVersion", in: "query", schema: { type: "integer", minimum: 1 } },
+        ],
+        responses: {
+          "200": { description: "Full owner course detail with curriculum." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Version conflict." },
+        },
+      },
+      patch: {
+        operationId: "updateCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Updated owner course detail." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Version conflict." },
+        },
+      },
+      delete: {
+        operationId: "deleteCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Draft course deleted." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Course is not a draft." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/publish": {
+      post: {
+        operationId: "publishCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Course published." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Course is already published." },
+          "422": { description: "Course content is incomplete (details list failing checks)." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/archive": {
+      post: {
+        operationId: "archiveCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Published course archived." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Invalid status transition." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/unpublish": {
+      post: {
+        operationId: "unpublishCourse",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Archived course returned to draft." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "409": { description: "Invalid status transition." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/sections": {
+      post: {
+        operationId: "createSection",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Section appended to the course." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+        },
+      },
+    },
+    "/owner/sections/{sectionId}": {
+      patch: {
+        operationId: "renameSection",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "sectionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Section renamed." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Section not found." },
+          "409": { description: "Version conflict." },
+        },
+      },
+      delete: {
+        operationId: "deleteSection",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "sectionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Section and its lessons deleted." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Section not found." },
+        },
+      },
+    },
+    "/owner/sections/{sectionId}/position": {
+      post: {
+        operationId: "reorderSection",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "sectionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Section reordered; returns the final section order." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Section not found." },
+        },
+      },
+    },
+    "/owner/sections/{sectionId}/lessons": {
+      post: {
+        operationId: "createLesson",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "sectionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Lesson appended to the section." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Section not found." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}": {
+      patch: {
+        operationId: "updateLesson",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Lesson updated." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Lesson not found." },
+        },
+      },
+      delete: {
+        operationId: "deleteLesson",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Lesson deleted; remaining lessons renumbered." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Lesson not found." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}/move": {
+      post: {
+        operationId: "moveLesson",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Lesson moved to the target section position." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Lesson or target section not found." },
+          "422": { description: "Target section belongs to a different course." },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

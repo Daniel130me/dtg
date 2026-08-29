@@ -1,30 +1,46 @@
 'use client';
 
-import React from 'react';
-import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Star, Twitter, Linkedin, Youtube, Globe as GlobeIcon, BookOpen, BarChart3, Smartphone, Code, Cloud, Palette } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Lock, BookOpen, BarChart3, Cloud, Code, Palette, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import StarRating from '@/components/prototype/shared/StarRating';
-import { useNav } from '@/lib/prototype/navigation';
-import { courses, reviews, enrolments } from '@/lib/prototype/mock-data';
+import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
+import { fetchCourseDetail } from '@/features/catalog/api';
+import { ApiClientError } from '@/lib/client/api-client';
+import { formatCount, formatDuration, formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
+import type { CourseDetailDto, CourseLessonDto } from '@/contracts/catalog';
 
-type LessonType = 'video' | 'text' | 'quiz' | 'assignment';
+type DetailLessonType = CourseLessonDto['type'];
 
-const lessonIconMap: Record<LessonType, React.ReactNode> = {
-  video: <PlayCircle className='size-4 text-primary' />,
-  text: <FileText className='size-4 text-amber-600' />,
-  quiz: <HelpCircle className='size-4 text-orange-500' />,
-  assignment: <ClipboardList className='size-4 text-rose-500' />,
+const lessonIconMap: Record<DetailLessonType, React.ReactNode> = {
+  'VIDEO': <PlayCircle className='size-4 text-primary' />,
+  'TEXT': <FileText className='size-4 text-amber-600' />,
+  'QUIZ': <HelpCircle className='size-4 text-orange-500' />,
+  'ASSIGNMENT': <ClipboardList className='size-4 text-rose-500' />,
 };
 
+/** Gradient placeholders keyed by category slug (same palette as CourseCard). */
 const categoryGradients: Record<string, string> = {
-  'Web Development': 'from-[#1d4ed8] to-[#0a1a3e]',
-  'Data Science': 'from-[#2563eb] to-[#0f2847]',
-  'Mobile Development': 'from-[#3b82f6] to-[#1e3a8a]',
-  'DevOps & Cloud': 'from-[#0f2847] to-[#0a1a3e]',
-  'Design & UI/UX': 'from-[#4338ca] to-[#0a1a3e]',
+  'web-development': 'from-[#1d4ed8] to-[#0a1a3e]',
+  'data-science': 'from-[#2563eb] to-[#0f2847]',
+  'mobile-development': 'from-[#3b82f6] to-[#1e3a8a]',
+  'devops-and-cloud': 'from-[#0f2847] to-[#0a1a3e]',
+  'design-and-ui-ux': 'from-[#4338ca] to-[#0a1a3e]',
+};
+
+const categoryIconNameMap: Record<string, string> = {
+  'web-development': 'Code',
+  'data-science': 'BarChart3',
+  'mobile-development': 'Smartphone',
+  'devops-and-cloud': 'Cloud',
+  'design-and-ui-ux': 'Palette',
 };
 
 const categoryIconMap: Record<string, React.ReactNode> = {
@@ -35,42 +51,138 @@ const categoryIconMap: Record<string, React.ReactNode> = {
   'Palette': <Palette className='size-20 text-white/70' />,
 };
 
-const categoryIconNameMap: Record<string, string> = {
-  'Web Development': 'Code',
-  'Data Science': 'BarChart3',
-  'Mobile Development': 'Smartphone',
-  'DevOps & Cloud': 'Cloud',
-  'Design & UI/UX': 'Palette',
-};
+const DEFAULT_GRADIENT = 'from-[#1d4ed8] to-[#0a1a3e]';
+
+function DetailSkeleton() {
+  return (
+    <main className='flex-1'>
+      <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+        <div className='grid lg:grid-cols-3 gap-8'>
+          <div className='lg:col-span-2 space-y-4'>
+            <div className='flex gap-2'>
+              <Skeleton className='h-5 w-24' />
+              <Skeleton className='h-5 w-28' />
+            </div>
+            <Skeleton className='h-10 w-3/4' />
+            <Skeleton className='h-4 w-full' />
+            <Skeleton className='h-4 w-5/6' />
+            <Skeleton className='h-5 w-44' />
+            <div className='flex gap-4 pt-2'>
+              <Skeleton className='h-4 w-28' />
+              <Skeleton className='h-4 w-20' />
+              <Skeleton className='h-4 w-16' />
+            </div>
+          </div>
+          <Card className='p-0 overflow-hidden gap-0 h-fit'>
+            <Skeleton className='h-40 w-full rounded-b-none' />
+            <CardContent className='p-6 space-y-3'>
+              <Skeleton className='h-9 w-1/2' />
+              <Skeleton className='h-10 w-full' />
+              <Skeleton className='h-3 w-2/3 mx-auto' />
+              <Skeleton className='h-24 w-full' />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    </main>
+  );
+}
 
 export default function CourseDetailPage() {
-  const { navigate, isAuthenticated, viewParams } = useNav();
-  const courseId = viewParams.courseId || 'course-1';
-  const course = courses.find(c => c.id === courseId) || courses[0];
-  const courseReviews = reviews.filter(r => r.courseId === course.id);
-  const enrollment = enrolments.find(e => e.courseId === course.id);
+  const params = useParams<{ courseId: string }>();
+  // The route segment is named `[courseId]` for prototype-historical reasons, but
+  // its value is the course SLUG (e.g. /courses/nextjs-masterclass) — the catalog
+  // API looks courses up by slug, so we treat it as one.
+  const slug = params.courseId;
 
-  const gradient = categoryGradients[course.categoryName] || 'from-[#1d4ed8] to-[#0a1a3e]';
-  const iconKey = categoryIconNameMap[course.categoryName] || 'Code';
+  // Loading is DERIVED from the request key (see HomePage) so effects never
+  // call setState synchronously; all state writes happen in async callbacks.
+  const [course, setCourse] = useState<CourseDetailDto | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [retrySeed, setRetrySeed] = useState(0);
+  const requestKey = `${slug}#${retrySeed}`;
+  const loading = loadedKey !== requestKey;
 
-  const handleEnrol = () => {
-    if (!isAuthenticated) {
-      navigate('login');
-      return;
-    }
-    navigate('learning-player', { courseId: course.id, lessonId: 'les-6' });
-  };
+  useEffect(() => {
+    let cancelled = false;
+    fetchCourseDetail(slug)
+      .then((dto) => {
+        if (cancelled) return;
+        setCourse(dto);
+        setNotFound(false);
+        setError(null);
+        setLoadedKey(requestKey);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof ApiClientError && err.status === 404) {
+          setNotFound(true);
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load this course.');
+        }
+        setLoadedKey(requestKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, requestKey]);
 
-  const handleContinue = () => {
-    navigate('learning-player', { courseId: course.id, lessonId: enrollment?.currentLessonId || 'les-1' });
-  };
+  if (loading) return <DetailSkeleton />;
+
+  if (notFound) {
+    return (
+      <main className='flex-1'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center'>
+          <div className='size-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4'>
+            <BookOpen className='size-7 text-muted-foreground' />
+          </div>
+          <h1 className='font-semibold text-lg mb-1'>Course not found</h1>
+          <p className='text-sm text-muted-foreground mb-6 max-w-sm mx-auto'>
+            This course doesn&apos;t exist or is no longer published. Browse the catalog to find something else.
+          </p>
+          <Button variant='outline' asChild>
+            <Link href='/courses'>Browse Courses</Link>
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <main className='flex-1'>
+        <FetchErrorState
+          title="Couldn't load this course"
+          message={error ?? undefined}
+          onRetry={() => setRetrySeed((s) => s + 1)}
+          className='py-24'
+        />
+      </main>
+    );
+  }
+
+  const gradient = categoryGradients[course.categorySlug] ?? DEFAULT_GRADIENT;
+  const iconKey = categoryIconNameMap[course.categorySlug] ?? 'Code';
+  const bioFirstSentence = course.instructor.bio
+    ? `${course.instructor.bio.split('.')[0]}.`
+    : 'This instructor has not added a bio yet.';
+  const instructorInitials = course.instructor.name
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('');
+  const firstSectionId = course.sections[0]?.id;
 
   return (
     <main className='flex-1'>
       {/* Back Button */}
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4'>
-        <Button variant='ghost' size='sm' onClick={() => navigate('courses')} className='gap-1.5 text-muted-foreground hover:text-foreground'>
-          <ArrowLeft className='size-4' /> Back to Courses
+        <Button variant='ghost' size='sm' asChild className='gap-1.5 text-muted-foreground hover:text-foreground'>
+          <Link href='/courses'>
+            <ArrowLeft className='size-4' /> Back to Courses
+          </Link>
         </Button>
       </div>
 
@@ -79,20 +191,27 @@ export default function CourseDetailPage() {
         <div className='grid lg:grid-cols-3 gap-8'>
           <div className='lg:col-span-2'>
             <div className='flex flex-wrap gap-2 mb-3'>
-              <Badge>{course.level}</Badge>
-              <Badge variant='secondary'>{course.categoryName}</Badge>
+              <Badge>{formatLevel(course.level)}</Badge>
+              <Badge variant='secondary' asChild>
+                <Link href={`/courses?category=${course.categorySlug}`}>{course.categoryName}</Link>
+              </Badge>
               {course.badge === 'popular' && <Badge className='bg-orange-500 text-white border-orange-500'>Popular</Badge>}
               {course.badge === 'new' && <Badge className='bg-amber-500 text-white border-amber-500'>New</Badge>}
             </div>
             <h1 className='text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight'>{course.title}</h1>
             <p className='text-muted-foreground leading-relaxed mb-4'>{course.description}</p>
-            <StarRating rating={course.rating} size='lg' showCount count={course.reviewCount} />
+            {course.ratingAverage !== null ? (
+              <StarRating rating={course.ratingAverage} size='lg' showCount count={course.ratingCount} />
+            ) : (
+              <span className='text-sm text-muted-foreground'>No ratings yet</span>
+            )}
             <div className='flex items-center gap-2 mt-2 text-sm text-muted-foreground'>
-              <span>Created by <button onClick={() => navigate('about')} className='text-primary font-medium hover:underline'>{course.instructor.name}</button></span>
+              <span>Created by <span className='text-foreground font-medium'>{course.instructor.name}</span></span>
             </div>
+            {/* Stats row */}
             <div className='flex flex-wrap items-center gap-4 mt-4 text-sm text-muted-foreground'>
-              <span className='flex items-center gap-1.5'><Users className='size-4' /> {course.studentsEnrolled.toLocaleString()} students</span>
-              <span className='flex items-center gap-1.5'><Clock className='size-4' /> {course.duration}</span>
+              <span className='flex items-center gap-1.5'><Users className='size-4' /> {formatCount(course.enrollmentCount)} students</span>
+              <span className='flex items-center gap-1.5'><Clock className='size-4' /> {formatDuration(course.totalMinutes)}</span>
               <span className='flex items-center gap-1.5'><Globe className='size-4' /> {course.language}</span>
               <span className='flex items-center gap-1.5'><BookOpen className='size-4' /> {course.totalLessons} lessons</span>
             </div>
@@ -102,35 +221,36 @@ export default function CourseDetailPage() {
           <div>
             <Card className='sticky top-20 p-0 overflow-hidden gap-0'>
               <div className={`h-40 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
-                {categoryIconMap[iconKey] || <Code className='size-20 text-white/70' />}
+                {categoryIconMap[iconKey] ?? <BookOpen className='size-20 text-white/70' />}
               </div>
               <CardContent className='p-6'>
                 <div className='text-3xl font-bold mb-1'>
                   {course.isFree ? (
-                    <span className='text-[#1d4ed8]'>Free</span>
+                    <span className='text-[#1d4ed8]'>{formatPrice(course.priceMinor, course.currency)}</span>
                   ) : (
-                    <>${course.price}</>
+                    <>{formatPrice(course.priceMinor, course.currency)}</>
                   )}
                 </div>
                 <p className='text-xs text-muted-foreground mb-5'>30-day money-back guarantee</p>
 
-                {enrollment ? (
-                  <Button className='w-full' size='lg' onClick={handleContinue}>
-                    Continue Learning
-                    {enrollment.progress > 0 && <span className='text-primary-foreground/70 ml-2 text-xs'>({enrollment.progress}%)</span>}
-                  </Button>
-                ) : (
-                  <Button className='w-full' size='lg' onClick={handleEnrol}>
-                    {isAuthenticated ? 'Enrol Now' : 'Login to Enrol'}
-                  </Button>
-                )}
+                {/* Enrolment is a later phase — the CTA is disabled until payments land. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className='block w-full cursor-not-allowed'>
+                      <Button className='w-full' size='lg' disabled>
+                        {course.isFree ? 'Enroll' : 'Enroll Now'}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Enrolment opens soon</TooltipContent>
+                </Tooltip>
 
                 <p className='text-center text-xs text-muted-foreground mt-3'>Includes {course.totalSections} sections &middot; {course.totalLessons} lessons</p>
 
                 <div className='mt-5 space-y-3 text-sm'>
                   <h3 className='font-semibold text-sm'>This course includes:</h3>
                   <ul className='space-y-2 text-muted-foreground'>
-                    <li className='flex items-center gap-2'><PlayCircle className='size-4 text-primary shrink-0' /> {course.duration} of video content</li>
+                    <li className='flex items-center gap-2'><PlayCircle className='size-4 text-primary shrink-0' /> {formatDuration(course.totalMinutes)} of video content</li>
                     <li className='flex items-center gap-2'><FileText className='size-4 text-primary shrink-0' /> Downloadable resources</li>
                     <li className='flex items-center gap-2'><HelpCircle className='size-4 text-primary shrink-0' /> Quizzes & assignments</li>
                     <li className='flex items-center gap-2'><CheckCircle2 className='size-4 text-primary shrink-0' /> Certificate of completion</li>
@@ -144,28 +264,48 @@ export default function CourseDetailPage() {
       </section>
 
       {/* What You'll Learn */}
-      <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        <Card className='p-6'>
-          <h2 className='text-lg font-bold mb-4'>What You'll Learn</h2>
-          <div className='grid sm:grid-cols-2 gap-3'>
-            {course.whatYouLearn.map((item, i) => (
-              <div key={i} className='flex items-start gap-2.5'>
-                <CheckCircle2 className='size-5 text-primary shrink-0 mt-0.5' />
-                <span className='text-sm text-muted-foreground'>{item}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
+      {course.outcomes.length > 0 && (
+        <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+          <Card className='p-6'>
+            <h2 className='text-lg font-bold mb-4'>What You&apos;ll Learn</h2>
+            <div className='grid sm:grid-cols-2 gap-3'>
+              {course.outcomes.map((item, i) => (
+                <div key={i} className='flex items-start gap-2.5'>
+                  <CheckCircle2 className='size-5 text-primary shrink-0 mt-0.5' />
+                  <span className='text-sm text-muted-foreground'>{item}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+      )}
+
+      {/* Requirements */}
+      {course.requirements.length > 0 && (
+        <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+          <Card className='p-6'>
+            <h2 className='text-lg font-bold mb-4'>Requirements</h2>
+            <ul className='space-y-2.5'>
+              {course.requirements.map((item, i) => (
+                <li key={i} className='flex items-start gap-2.5'>
+                  <span className='size-1.5 rounded-full bg-primary mt-2 shrink-0' />
+                  <span className='text-sm text-muted-foreground'>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       {/* Curriculum */}
       <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
         <div className='flex items-center justify-between mb-6'>
           <h2 className='text-lg font-bold'>Course Curriculum</h2>
-          <span className='text-sm text-muted-foreground'>{course.sections.length} sections &middot; {course.totalLessons} lessons &middot; {course.duration} total</span>
+          <span className='text-sm text-muted-foreground'>{course.sections.length} sections &middot; {course.totalLessons} lessons &middot; {formatDuration(course.totalMinutes)} total</span>
         </div>
-        <Accordion type='multiple' defaultValue={[course.sections[0]?.id]} className='w-full'>
-          {course.sections.map((section) => (
+        {course.sections.length > 0 ? (
+          <Accordion type='multiple' defaultValue={firstSectionId ? [firstSectionId] : []} className='w-full'>
+            {course.sections.map((section) => (
               <AccordionItem key={section.id} value={section.id}>
                 <AccordionTrigger className='hover:no-underline'>
                   <div className='flex items-center gap-3 text-left'>
@@ -178,100 +318,51 @@ export default function CourseDetailPage() {
                     {section.lessons.map((lesson) => (
                       <div
                         key={lesson.id}
-                        className='flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer'
-                        onClick={() => isAuthenticated && navigate('learning-player', { courseId: course.id, lessonId: lesson.id })}
+                        className='flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors'
                       >
                         <div className='flex items-center gap-3'>
-                          {lesson.isCompleted ? (
-                            <CheckCircle2 className='size-4 text-[#1d4ed8]' />
-                          ) : (
-                            lessonIconMap[lesson.type]
-                          )}
-                          <span className={`text-sm ${lesson.isCompleted ? 'text-muted-foreground line-through' : ''}`}>{lesson.title}</span>
-                          {lesson.isPreview && (
+                          {lessonIconMap[lesson.type]}
+                          <span className='text-sm'>{lesson.title}</span>
+                          {lesson.isPreview ? (
                             <Badge variant='secondary' className='text-[10px] gap-1'>
                               <Eye className='size-3' /> Preview
                             </Badge>
+                          ) : (
+                            <Lock className='size-3.5 text-muted-foreground/60' />
                           )}
                         </div>
-                        <span className='text-xs text-muted-foreground'>{lesson.duration}</span>
+                        <span className='text-xs text-muted-foreground'>{formatLessonDuration(lesson.durationSeconds)}</span>
                       </div>
                     ))}
                   </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
-        </Accordion>
+          </Accordion>
+        ) : (
+          <Card className='p-8 text-center'>
+            <p className='text-muted-foreground'>The curriculum for this course is being prepared.</p>
+          </Card>
+        )}
       </section>
 
       {/* Instructor Card */}
-      <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
+      <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16'>
         <Card className='p-6'>
           <h2 className='text-lg font-bold mb-4'>Instructor</h2>
           <div className='flex flex-col sm:flex-row gap-5 items-start'>
             <div className='size-16 rounded-xl bg-gradient-to-br from-[#1d4ed8] to-[#0a1a3e] flex items-center justify-center shrink-0'>
-              <span className='text-xl font-bold text-white'>DG</span>
+              <span className='text-xl font-bold text-white'>{instructorInitials}</span>
             </div>
             <div className='flex-1'>
-              <button onClick={() => navigate('about')} className='text-base font-bold hover:text-primary transition-colors'>{course.instructor.name}</button>
+              <p className='text-base font-bold'>{course.instructor.name}</p>
               <p className='text-sm text-primary mb-2'>{course.instructor.title}</p>
-              <p className='text-sm text-muted-foreground leading-relaxed mb-3'>
-                {course.instructor.bio.split('.')[0]}.
+              <p className='text-sm text-muted-foreground leading-relaxed'>
+                {bioFirstSentence}
               </p>
-              <div className='flex flex-wrap gap-4 text-sm mb-3'>
-                <span className='flex items-center gap-1'><Star className='size-3.5 fill-amber-400 text-amber-400' /> <span className='font-medium'>{course.instructor.rating}</span> rating</span>
-                <span className='flex items-center gap-1'><Users className='size-3.5' /> <span className='font-medium'>{course.instructor.totalStudents.toLocaleString()}</span> students</span>
-                <span className='flex items-center gap-1'><BookOpen className='size-3.5' /> <span className='font-medium'>{course.instructor.totalCourses}</span> courses</span>
-              </div>
-              <div className='flex gap-2'>
-                <Button variant='ghost' size='icon' className='size-8'><Twitter className='size-4' /></Button>
-                <Button variant='ghost' size='icon' className='size-8'><Linkedin className='size-4' /></Button>
-                <Button variant='ghost' size='icon' className='size-8'><Youtube className='size-4' /></Button>
-                <Button variant='ghost' size='icon' className='size-8'><GlobeIcon className='size-4' /></Button>
-              </div>
             </div>
           </div>
         </Card>
-      </section>
-
-      {/* Reviews */}
-      <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16'>
-        <div className='flex items-center gap-4 mb-6'>
-          <h2 className='text-lg font-bold'>Reviews</h2>
-          <Badge variant='secondary'>{courseReviews.length} reviews</Badge>
-        </div>
-
-        {courseReviews.length > 0 ? (
-          <div className='space-y-4'>
-            {courseReviews.map((review) => (
-              <Card key={review.id} className='p-6 gap-4'>
-                <div className='flex items-start justify-between'>
-                  <div className='flex items-center gap-3'>
-                    <div className='size-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0'>
-                      <span className='text-primary text-xs font-bold'>{review.userName.split(' ').map(n => n[0]).join('')}</span>
-                    </div>
-                    <div>
-                      <p className='text-sm font-semibold'>{review.userName}</p>
-                      <p className='text-xs text-muted-foreground'>{new Date(review.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                    </div>
-                  </div>
-                  <StarRating rating={review.rating} size='sm' />
-                </div>
-                <p className='text-sm text-muted-foreground leading-relaxed'>{review.comment}</p>
-                {review.instructorReply && (
-                  <div className='ml-10 mt-2 p-3 bg-muted/50 rounded-lg border-l-2 border-primary'>
-                    <p className='text-xs font-semibold text-primary mb-1'>Instructor Reply</p>
-                    <p className='text-sm text-muted-foreground'>{review.instructorReply}</p>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className='p-8 text-center'>
-            <p className='text-muted-foreground'>No reviews yet. Be the first to review this course!</p>
-          </Card>
-        )}
       </section>
     </main>
   );

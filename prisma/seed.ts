@@ -2,8 +2,8 @@ import { PrismaClient, CourseLevel, LessonType, CourseStatus } from "@prisma/cli
 import {
   categories as mockCategories,
   courses as mockCourses,
-  type Course as MockCourse,
 } from "@/lib/prototype/mock-data";
+import type { Course as MockCourse } from "@/lib/prototype/types";
 
 const prisma = new PrismaClient();
 

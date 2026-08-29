@@ -3,3 +3,4 @@ export { default as CourseManagementPage } from "@/components/prototype/pages/in
 export { default as StudentManagementPage } from "@/components/prototype/pages/instructor/StudentManagement";
 export { default as OwnerAnalyticsPage } from "@/components/prototype/pages/instructor/AnalyticsPage";
 export { default as CreateCoursePage } from "@/components/prototype/pages/instructor/CreateCoursePage";
+export { default as CourseEditorPage } from "@/components/prototype/pages/instructor/CourseEditorPage";

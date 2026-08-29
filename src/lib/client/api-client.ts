@@ -1,4 +1,4 @@
-import type { ApiFailure, ApiSuccess } from "@/contracts/api";
+import type { ApiErrorDetail, ApiFailure, ApiSuccess } from "@/contracts/api";
 
 export class ApiClientError extends Error {
   constructor(
@@ -6,6 +6,7 @@ export class ApiClientError extends Error {
     public readonly code: string,
     message: string,
     public readonly requestId?: string,
+    public readonly details?: ApiErrorDetail[],
   ) {
     super(message);
     this.name = "ApiClientError";
@@ -34,6 +35,7 @@ export async function apiRequest<T>(
       failure?.code ?? "UNEXPECTED_RESPONSE",
       failure?.message ?? "The server returned an unexpected response.",
       failure?.requestId,
+      failure?.details,
     );
   }
 

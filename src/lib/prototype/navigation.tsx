@@ -55,7 +55,7 @@ function resolveView(pathname: string): ViewName {
   if (pathname === '/profile') return 'profile';
   if (pathname === '/owner') return 'instructor-dashboard';
   if (pathname === '/owner/courses/new') return 'create-course';
-  if (pathname === '/owner/courses') return 'course-management';
+  if (pathname === '/owner/courses' || pathname.startsWith('/owner/courses/')) return 'course-management';
   if (pathname === '/owner/students') return 'student-management';
   if (pathname === '/owner/analytics') return 'analytics';
   return 'home';
