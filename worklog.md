@@ -218,3 +218,27 @@ Stage Summary:
 - Custom CSS tokens (navy, navy-light, navy-lighter) added for easy theming
 - All gradient backgrounds, accent colors, and icon colors use navy-family hex values
 - Zero runtime errors, zero lint errors, fully responsive
+
+---
+Task ID: 6
+Agent: main-coordinator (sandbox continuation)
+Task: Clone dtg repo into sandbox, restore runtime environment, verify all routes and auth flows end-to-end
+
+Work Log:
+- Cloned https://github.com/Daniel130me/dtg.git and merged it into the active sandbox project directory (git history preserved)
+- Provisioned local PostgreSQL 17.5 via rootless portable binaries (zonky embedded-postgres-binaries) at ~/.pg, listening on 127.0.0.1:5433; created role `dtg` and database `dtg`
+- Wrote .env from .env.example with local DATABASE_URL/DIRECT_URL, random BETTER_AUTH_SECRET and RATE_LIMIT_SALT; discovered the sandbox platform injects a SQLite DATABASE_URL into the process env, so all runtime commands explicitly export the Postgres URL
+- Installed dependencies with bun (841 packages); ran `prisma generate` and `prisma migrate deploy` (3 migrations applied cleanly)
+- Seeded demo student (student@example.test) and provisioned the platform owner via guarded bootstrap: owner@dtg.test
+- Started `next dev -p 3000` in background with correct DB env; /api/v1/health/live and /api/v1/health/ready both return 200 with `database: available`
+- Browser-verified: homepage, /courses, /courses/[courseId] deep link, /about, /login, /register
+- Verified real auth end-to-end: owner login (better-auth session, owner dashboard shows DTG Owner/Platform Owner), student registration (Argon2id, email verification flow fires; SMTP absent so verification email fails gracefully with logged error), verified test student in DB, student sign-in lands on /dashboard
+- Verified mobile 375x812: hamburger Sheet drawer, auth-aware menu, responsive hero; footer sits flush with document bottom on long pages and sticks to viewport bottom on short pages (login: footer bottom 1207 == docH 1207)
+- Ran `bun run lint` (clean) and `bun run typecheck` (clean after excluding sandbox-only `skills/`, `tool-results/`, `upload/` folders from tsconfig)
+- Known non-blocking warnings: Radix Sheet trigger `aria-controls` id hydration mismatch (upstream radix-ui/react 19 quirk), two `DialogContent` missing-description a11y warnings, EMAIL_FROM unset error in dev log when registration triggers verification email
+
+Stage Summary:
+- Full stack restored and running in sandbox: Next.js 16.1.3 + Prisma 6 + PostgreSQL 17.5 (local) + better-auth
+- Sandbox credentials: owner@dtg.test / (see .env OWNER_PASSWORD), student1@dtg.test / SecurePass123!x
+- Phases 0, 0B, 1, 2, 3 verified working; prototype mock data intact pending Phase 4+ connection
+- Ready to continue with Phase 4 (profile/account lifecycle) per BACKEND_IMPLEMENTATION_PLAN.md

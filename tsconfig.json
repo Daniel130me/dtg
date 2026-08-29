@@ -39,6 +39,9 @@
   "exclude": [
     "node_modules",
     "examples",
-    "graphify-out"
+    "graphify-out",
+    "skills",
+    "tool-results",
+    "upload"
   ]
 }
