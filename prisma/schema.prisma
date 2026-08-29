@@ -54,6 +54,46 @@ enum IdempotencyStatus {
   COMPLETED
 }
 
+enum EnrolmentStatus {
+  ACTIVE
+  COMPLETED
+  REVOKED
+}
+
+enum EnrolmentSource {
+  FREE
+  PURCHASE
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
 enum OutboxStatus {
   PENDING
   PROCESSING
@@ -79,6 +119,8 @@ model User {
   auditLogs       AuditLog[]        @relation("AuditActor")
   ownedPlatform   PlatformSettings? @relation("PlatformOwner")
   createdCourses  Course[]          @relation("CourseCreator")
+  enrolments      Enrolment[]
+  orders          Order[]
 
   @@index([status, createdAt, id])
 }
@@ -274,6 +316,8 @@ model Course {
   sections     CourseSection[]
   requirements CourseRequirement[]
   outcomes     CourseOutcome[]
+  enrolments   Enrolment[]
+  orderItems   OrderItem[]
 
   @@index([status, publishedAt, id])
   @@index([categoryId, status])
@@ -341,4 +385,130 @@ model CourseOutcome {
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([courseId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Commerce and enrolment
+//
+// Money is always integer minor units with an explicit currency. Provider
+// references are nullable VarChars (never enums) so adopting a payment
+// provider never requires a migration, and (provider, providerRef) is unique
+// everywhere so provider events can be replayed safely.
+// ---------------------------------------------------------------------------
+
+model Enrolment {
+  id           String          @id @default(uuid()) @db.Uuid
+  userId       String          @db.Uuid
+  courseId     String          @db.Uuid
+  status       EnrolmentStatus @default(ACTIVE)
+  // How the learner got in: free enrolment, a paid order, or an owner grant.
+  source       EnrolmentSource @default(FREE)
+  // Set when source = PURCHASE; links the access to the paid order line.
+  // Unique: one purchase line produces at most one enrolment.
+  orderItemId  String?         @unique @db.Uuid
+  completedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  revokedAt    DateTime?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  // The enrolment idempotency guarantee: one row per learner per course.
+  @@unique([userId, courseId])
+  @@index([courseId, status])
+  @@index([userId, status, createdAt])
+}
+
+model Order {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @db.Uuid
+  status      OrderStatus @default(PENDING)
+  currency    String      @db.VarChar(3)
+  totalMinor  Int
+  provider    String?     @db.VarChar(64)
+  providerRef String?     @db.VarChar(255)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@unique([provider, providerRef])
+}
+
+model OrderItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  courseId       String   @db.Uuid
+  // Server-owned price snapshot taken at checkout time; client prices are
+  // never trusted.
+  unitPriceMinor Int
+  currency       String   @db.VarChar(3)
+
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  enrolment  Enrolment?
+
+  @@unique([orderId, courseId])
+  @@index([courseId])
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  orderId     String        @db.Uuid
+  provider    String        @db.VarChar(64)
+  providerRef String?       @db.VarChar(255)
+  status      PaymentStatus @default(PENDING)
+  amountMinor Int
+  currency    String        @db.VarChar(3)
+  // Raw provider payload for reconciliation after the fact.
+  payload     Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  refunds Refund[]
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@unique([provider, providerRef])
+}
+
+model Refund {
+  id          String       @id @default(uuid()) @db.Uuid
+  paymentId   String       @db.Uuid
+  provider    String       @db.VarChar(64)
+  providerRef String?      @db.VarChar(255)
+  status      RefundStatus @default(PENDING)
+  amountMinor Int
+  currency    String       @db.VarChar(3)
+  reason      String?      @db.VarChar(500)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@unique([provider, providerRef])
+}
+
+model WebhookEvent {
+  id          String             @id @default(uuid()) @db.Uuid
+  provider    String             @db.VarChar(64)
+  providerRef String             @db.VarChar(255)
+  topic       String             @db.VarChar(100)
+  payload     Json
+  status      WebhookEventStatus @default(RECEIVED)
+  attempts    Int                @default(0)
+  receivedAt  DateTime           @default(now())
+  processedAt DateTime?
+  lastError   String?            @db.Text
+
+  @@unique([provider, providerRef])
+  @@index([status, receivedAt])
 }
