@@ -47,10 +47,14 @@ function buildQueryString(query: OwnerCourseListQuery): string {
 // Courses
 // -------------------------------------------------------------------------
 
-export function listOwnerCourses(
+export async function listOwnerCourses(
   query: OwnerCourseListQuery = {},
 ): Promise<CursorPage<OwnerCourseListItemDto>> {
-  return apiRequest(`${OWNER_API_BASE}/courses${buildQueryString(query)}`);
+  // The list handler wraps the page: { data: { courses: { items, nextCursor } } }.
+  const { courses } = await apiRequest<{ courses: CursorPage<OwnerCourseListItemDto> }>(
+    `${OWNER_API_BASE}/courses${buildQueryString(query)}`,
+  );
+  return courses;
 }
 
 export async function getOwnerCourse(courseId: string): Promise<OwnerCourseDetailDto> {
