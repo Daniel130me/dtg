@@ -542,25 +542,25 @@ Exit gate:
 
 Goal: complete the assessment-to-credential path without trust gaps.
 
-- [ ] Add versioned quiz/question/option, attempt/answer, assignment/submission, grade, and certificate models.
+- [x] Add versioned quiz/question/option, attempt/answer, assignment/submission, grade, and certificate models.
   Commit: `feat(assessments): add assessment and certificate schema`
-- [ ] Implement owner-only assessment authoring with answer keys excluded from learner DTOs.
+- [x] Implement owner-only assessment authoring with answer keys excluded from learner DTOs.
   Commit: `feat(assessments): add secure assessment authoring`
-- [ ] Implement attempt start/submit with attempt limits, expiry, immutable question-version snapshots, and server-side scoring.
+- [x] Implement attempt start/submit with attempt limits, expiry, immutable question-version snapshots, and server-side scoring.
   Commit: `feat(quizzes): add secure quiz attempt workflow`
-- [ ] Implement assignment submission through verified R2 assets with deadlines and resubmission policy.
+- [x] Implement assignment submission through verified R2 assets with deadlines and resubmission policy.
   Commit: `feat(assignments): add managed assignment submissions`
-- [ ] Implement owner grading with history, feedback, and learner notification.
+- [x] Implement owner grading with history, feedback, and learner notification.
   Commit: `feat(grading): add audited grading workflow`
-- [ ] Implement certificate eligibility from canonical completion/assessment state and issue exactly once.
+- [x] Implement certificate eligibility from canonical completion/assessment state and issue exactly once.
   Commit: `feat(certificates): add idempotent certificate issuance`
-- [ ] Generate certificate files asynchronously, store them privately in R2, and expose signed downloads.
+- [x] Generate certificate files asynchronously, store them privately in R2, and expose signed downloads.
   Commit: `feat(certificates): add certificate generation pipeline`
-- [ ] Add public verification by high-entropy code with minimal personal information and revocation support.
+- [x] Add public verification by high-entropy code with minimal personal information and revocation support.
   Commit: `feat(certificates): add public certificate verification`
-- [ ] Connect quiz, assignment, grading, certificate list/download, and public verification screens to real contracts.
+- [x] Connect quiz, assignment, grading, certificate list/download, and public verification screens to real contracts.
   Commit: `feat(frontend-assessments): connect assessment and certificate workflows`
-- [ ] Add answer-leakage, replay, race-condition, grading authorization, and duplicate-certificate tests.
+- [x] Add answer-leakage, replay, race-condition, grading authorization, and duplicate-certificate tests.
   Commit: `test(assessments): cover assessment and credential security`
 
 Exit gate:
