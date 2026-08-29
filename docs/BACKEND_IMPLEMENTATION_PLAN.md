@@ -514,23 +514,23 @@ Exit gate:
 
 Goal: provide durable learner state and secure course access.
 
-- [ ] Add lesson-progress, lesson-note, discussion-thread, and discussion-post models with ownership and ordering constraints.
+- [x] Add lesson-progress, lesson-note, discussion-thread, and discussion-post models with ownership and ordering constraints.
   Commit: `feat(learning): add progress notes and discussion schema`
-- [ ] Implement learner dashboard and “my learning” read models with bounded, indexed queries.
+- [x] Implement learner dashboard and “my learning” read models with bounded, indexed queries.
   Commit: `feat(learning): add learner dashboard endpoints`
-- [ ] Implement curriculum access rules for enrolments and explicitly marked public previews.
+- [x] Implement curriculum access rules for enrolments and explicitly marked public previews.
   Commit: `feat(learning): enforce lesson access policies`
-- [ ] Implement idempotent progress updates with monotonic completion rules and server-derived course progress.
+- [x] Implement idempotent progress updates with monotonic completion rules and server-derived course progress.
   Commit: `feat(learning): add durable lesson progress tracking`
-- [ ] Implement note save/export endpoints with per-user authorization and sensible size limits.
+- [x] Implement note save/export endpoints with per-user authorization and sensible size limits.
   Commit: `feat(learning): add private lesson notes`
-- [ ] Implement lesson Q&A creation, replies, pagination, moderation state, and notifications.
+- [x] Implement lesson Q&A creation, replies, pagination, moderation state, and notifications.
   Commit: `feat(discussions): add lesson question and answer workflows`
-- [ ] Add transactional completion events for analytics and certificate eligibility.
+- [x] Add transactional completion events for analytics and certificate eligibility.
   Commit: `feat(learning): emit course completion events`
-- [ ] Connect learner dashboard, course library, player, progress, notes, resources, and Q&A to the real learning contracts.
+- [x] Connect learner dashboard, course library, player, progress, notes, resources, and Q&A to the real learning contracts.
   Commit: `feat(frontend-learning): connect learner workflows`
-- [ ] Add concurrency, access-control, query-count, and progress-invariant tests.
+- [x] Add concurrency, access-control, query-count, and progress-invariant tests.
   Commit: `test(learning): cover progress and course access`
 
 Exit gate:
