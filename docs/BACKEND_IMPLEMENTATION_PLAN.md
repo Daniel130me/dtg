@@ -485,23 +485,23 @@ Exit gate:
 
 Goal: make free and paid enrolment atomic, idempotent, and auditable.
 
-- [ ] Add provider-neutral payment interfaces and choose/configure the launch provider before enabling paid courses.
+- [x] Add provider-neutral payment interfaces and choose/configure the launch provider before enabling paid courses.
   Commit: `feat(payments): add payment provider boundary`
-- [ ] Add order, order-item, payment, refund, webhook-event, and enrolment models with monetary constraints and unique provider references.
+- [x] Add order, order-item, payment, refund, webhook-event, and enrolment models with monetary constraints and unique provider references.
   Commit: `feat(payments): add commerce and enrolment schema`
-- [ ] Implement idempotent free-course enrolment with unique `(userId, courseId)` enforcement.
+- [x] Implement idempotent free-course enrolment with unique `(userId, courseId)` enforcement.
   Commit: `feat(enrolments): add free course enrolment`
-- [ ] Implement checkout initialization using server-owned course price and currency snapshots.
+- [x] Implement checkout initialization using server-owned course price and currency snapshots.
   Commit: `feat(payments): add secure checkout initialization`
-- [ ] Implement signature-verified, replay-safe payment webhooks that fulfil orders and enrolments transactionally.
+- [x] Implement signature-verified, replay-safe payment webhooks that fulfil orders and enrolments transactionally.
   Commit: `feat(payments): add idempotent webhook fulfilment`
-- [ ] Implement order/payment status endpoints and recovery for provider success followed by local processing failure.
+- [x] Implement order/payment status endpoints and recovery for provider success followed by local processing failure.
   Commit: `feat(payments): add payment reconciliation workflow`
-- [ ] Implement refund and enrolment-access policy with immutable financial audit records.
+- [x] Implement refund and enrolment-access policy with immutable financial audit records.
   Commit: `feat(payments): add refund and access revocation workflow`
-- [ ] Connect enrol/checkout/status UI with duplicate-submit protection, recoverable pending states, and server-owned pricing.
+- [x] Connect enrol/checkout/status UI with duplicate-submit protection, recoverable pending states, and server-owned pricing.
   Commit: `feat(frontend-payments): connect enrolment and checkout workflows`
-- [ ] Add tests for price tampering, duplicate webhooks, reordered events, abandoned checkout, partial failure, and currency rounding.
+- [x] Add tests for price tampering, duplicate webhooks, reordered events, abandoned checkout, partial failure, and currency rounding.
   Commit: `test(payments): cover payment and enrolment invariants`
 
 Exit gate:
