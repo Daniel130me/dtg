@@ -394,3 +394,41 @@ Stage Summary:
 - SMTP is live-configured, so registration/verification emails will actually send from kosokodaniel@gmail.com from now on; owner login does not depend on it (pre-verified)
 - Seed data is deterministic and idempotent - safe to re-run with `bun run db:seed` against Neon (NODE_ENV=development guard only blocks production)
 - Login redirect contract: safeRedirectPath -> null means "no safe returnTo", caller picks role fallback; /dashboard is student-only server-side
+
+---
+Task ID: 10-a
+Agent: enrolment-frontend
+Task: Wire Phase 7 enrolment into the frontend (enrolment API wrappers, session-aware course detail CTA, real-data My Learning page)
+
+Work Log:
+- Read instruction.md, worklog.md (Tasks 8-d/8-e conventions), src/contracts/enrolments.ts (TDZ-ordered constants, DTO schemas, ENROLMENT_STATUS_FILTERS), src/features/catalog/api.ts, src/lib/client/{api-client,auth-client,format,safe-redirect}.ts, src/lib/prototype/navigation.tsx, AsyncStates.tsx, CourseCard.tsx, CoursesPage.tsx (reference loadedKey/requestKey implementation), StudentLayout.tsx, features/learning/index.ts, and both target pages before writing code
+- Created `src/features/learning/api.ts` mirroring catalog/api.ts exactly: `EnrolmentListQueryInput = z.input<typeof enrolmentListQuerySchema>` (defaults stay server-side), buildEnrolmentQueryString skipping undefined/empty, fetchMyEnrolments (GET /api/v1/learning/enrolments), fetchCourseEnrolmentState (GET /api/v1/courses/{slug}/enrolment), enrollInCourse (POST /api/v1/courses/{slug}/enroll, unwraps `{ enrolment }`); slugs encodeURIComponent'd
+- Exported the API module from `src/features/learning/index.ts` (existing page-component exports untouched; `(student)/learning/page.tsx` still imports MyLearningPage from there)
+- Rewrote the CourseDetailPage CTA block into a session-aware enrolment CTA: `authClient.useSession()` (isPending guards pre-session renders), enrolment probe effect that only fires when a session user id exists AND the course detail request has settled (loading derived from loadedKey/requestKey; effects setState only inside async callbacks), five render branches - enrolled (CheckCircle2 success panel + "Go to Classroom" next/link to /learning), state resolving (disabled), signed out (active Enroll -> router.push(`/login?returnTo=${encodeURIComponent(`/courses/{slug}`)}`)), signed in + free (idempotent enrollInCourse with "Enrolling..." spinner, duplicate-submit guard, sonner success toast "You're enrolled", local enrolled-state update instead of refetch; ApiClientError 401 reroutes to login with returnTo, other errors toast the server message), signed in + paid (disabled button + Tooltip "Paid enrolment is coming soon")
+- Rewrote `MyLearningPage.tsx` dropping ALL mock-data imports (enrolments/certificates/courses; certificates stay Phase 9): server-filtered Tabs All (no status) / In Progress (ACTIVE) / Completed (COMPLETED) with AnimatePresence keyed on the tab, per-card gradient banner keyed by categorySlug (fallback gradient + CourseCard-style initials, thumbnailUrl honoured), category name, formatLevel badge, formatDuration(totalMinutes), totalLessons, human-readable enrolledAt (Intl.DateTimeFormat), status Badge map (ACTIVE default "In progress" / COMPLETED secondary "Completed" / REVOKED destructive "Revoked"), whole card next/link to /courses/{slug} with Continue affordance, local EnrolmentCardSkeleton mirroring the card layout, FetchErrorState with retry (401 renders a "session expired" message), friendly empty state per tab with "Browse Courses" -> /courses, cursor "Load More" appending items while keeping total, "Showing X of Y courses" summary, ENROLMENT_PAGE_LIMIT_DEFAULT page size
+- Mounted the sonner Toaster in `src/app/(public)/layout.tsx` and `src/app/(student)/layout.tsx` (position bottom-right, richColors) because the root layout only mounts the radix toaster - without this the spec'd enrolment toasts would never render; mirrors the owner layout pattern from Task 8-e
+- Quality gates: `bun run lint` exit 0 zero problems; `bun run typecheck` (tsc --noEmit) exit 0 repo-wide; smoke-checked /learning and /courses/{slug} render 200 on the dev server (no browser-level enrolment flow test - API routes are landing in parallel per task scope)
+
+Stage Summary:
+- Enrolment is wired end-to-end on the client: typed wrappers in features/learning/api, honest CTA states on the course detail page (sign-in redirect with returnTo, idempotent free enrolment, paid clearly marked as coming soon), and My Learning now renders real DB enrolments with server-side status filtering and cursor pagination
+- react-hooks/set-state-in-effect conformance kept on both pages via derived loading keys; no sync setState in any effect body
+- Deviations: (1) sonner Toaster added to the public/student layouts (required for the specified toasts to be visible; scoped to layout files, not pages); (2) paid CTA keeps label "Enroll Now" with the tooltip carrying the spec text "Paid enrolment is coming soon"; (3) enrolment-probe failures deliberately fall through to the not-enrolled CTA (endpoint is idempotent, so this is safe) instead of adding a dedicated error/retry UI, which the spec did not request; (4) REVOKED badges render on the All tab even though the status filter only accepts ACTIVE/COMPLETED
+
+---
+Task ID: 10
+Agent: main-coordinator (backend/auth/E2E) + enrolment-frontend subagent (10-a)
+Task: Phase 7 milestone - commerce/enrolment schema, provider-neutral payment boundary, idempotent free enrolment, enrol/My-Learning frontend wiring
+
+Work Log:
+- (10-a subagent) Wired the frontend: session-aware course-detail CTA (signed-out -> login?returnTo, idempotent enroll with duplicate-submit protection + sonner feedback, enrolled -> Go to Classroom, paid -> disabled + tooltip), full My Learning rewrite (server-filtered tabs, real enrolment cards, Load More, skeleton/error/empty states), typed wrappers in features/learning/api.ts; lint+typecheck clean
+- Schema: 6 commerce models (Enrolment/Order/OrderItem/Payment/Refund/WebhookEvent) with minor-unit money, explicit currency, unique (provider, providerRef) tuples, unique (userId, courseId) enrolment, unique orderItem->enrolment link; two hand-authored migrations deployed to Neon, drift check clean (only the known unmodeled pg_trgm index)
+- Backend: PaymentProvider boundary (null provider -> 503 PAYMENT_PROVIDER_NOT_CONFIGURED, fail-closed before any order write; price/currency always snapshotted server-side), enrolments service (tx + audit + P2002 race fallback -> idempotent 200, REVOKED reactivation, enrollmentCount increment on first enrolment only), 4 routes registered in OpenAPI
+- Tests: 9 new unit tests over eligibility logic + enrolment contracts (62/62 total); lint + typecheck clean
+- E2E (Neon + live SMTP): registered student@example.test via real sign-up, enrolled through the UI (toast + CTA flip + Go to Classroom), My Learning card renders real data, paid CTA disabled with tooltip, enrollmentCount incremented, unauthenticated enroll -> 401, paid enroll -> 422, paid checkout -> 503, duplicate enroll -> same enrolment id
+- BUG FOUND AND FIXED (100dfb5): live SMTP failure (Gmail rejects unroutable recipient) threw inside better-auth's sendVerificationEmail hook and aborted sign-up between user creation and credential-account creation - user row existed with NO Account row, permanently unsignable. Fixed by failing soft (sendEmailSafely): token is persisted before the send and sendOnSignIn retries delivery; verified the re-registered student now gets their credential account
+
+Stage Summary:
+- Free-course enrolment is live end-to-end on Neon; paid checkout fails closed until the launch payment provider business decision is made (provider boundary ready: implement interface + return it from getConfiguredPaymentProvider)
+- Enrolment idempotency rests on the DB unique constraint, not client behaviour; replay-safe (provider, providerRef) columns are ready for webhooks
+- Certificates section removed from My Learning (Phase 9 scope); student dashboard remains intentionally mock until Phase 8 (progress-aware read models)
+- Known deferred: Phase 7 remaining checklist (webhook fulfilment, reconciliation, refunds, provider tests) blocked on the provider choice; Phase 8 learner dashboard/progress/lesson-access next
