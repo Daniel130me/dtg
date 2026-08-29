@@ -1,4 +1,5 @@
 import type { UserRole } from "@prisma/client";
+import { cache } from "react";
 import { auth } from "@/server/auth/auth";
 import { db } from "@/server/db/client";
 import { ApiError } from "@/server/http/errors";
@@ -36,6 +37,12 @@ export async function requireAuthenticatedUser(headers: Headers): Promise<{
   const { status: _status, ...authorizedUser } = user;
   return { user: authorizedUser, sessionId: session.session.id };
 }
+
+/**
+ * Request-memoized variant for React Server Component trees: a layout and its
+ * pages can both call this per request while the session/user lookup runs once.
+ */
+export const requireAuthenticatedUserCached = cache(requireAuthenticatedUser);
 
 export async function requireOwner(headers: Headers): Promise<AuthorizedUser> {
   const { user } = await requireAuthenticatedUser(headers);

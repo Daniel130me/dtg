@@ -34,7 +34,9 @@ describe("authentication security", () => {
 
   it("allows only local redirect paths", () => {
     assert.equal(safeRedirectPath("/learning/course-1?lesson=2"), "/learning/course-1?lesson=2");
-    assert.equal(safeRedirectPath("https://attacker.example/steal"), "/dashboard");
-    assert.equal(safeRedirectPath("//attacker.example/steal"), "/dashboard");
+    // Unsafe or absent values return null so callers choose a role-aware fallback.
+    assert.equal(safeRedirectPath("https://attacker.example/steal"), null);
+    assert.equal(safeRedirectPath("//attacker.example/steal"), null);
+    assert.equal(safeRedirectPath(null), null);
   });
 });

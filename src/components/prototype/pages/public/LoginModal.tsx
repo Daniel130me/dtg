@@ -32,7 +32,10 @@ export default function LoginModal() {
       setError('Email or password is incorrect, or the email is not verified.');
       return;
     }
-    router.replace(safeRedirectPath(searchParams.get('returnTo')));
+    // Land owners in their console; an explicit returnTo always wins.
+    // (role is a better-auth additional field, not part of the generic client type.)
+    const role = (result.data?.user as { role?: string } | undefined)?.role;
+    router.replace(safeRedirectPath(searchParams.get('returnTo')) ?? (role === 'OWNER' ? '/owner' : '/dashboard'));
     router.refresh();
   };
 

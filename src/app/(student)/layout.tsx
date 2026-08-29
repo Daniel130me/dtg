@@ -1,10 +1,11 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { requireAuthenticatedUser } from '@/server/auth/authorization';
+import { requireAuthenticatedUserCached } from '@/server/auth/authorization';
 
 export default async function AuthenticatedStudentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   try {
-    await requireAuthenticatedUser(await headers());
+    // Memoized per request so the dashboard page's role check reuses this lookup.
+    await requireAuthenticatedUserCached(await headers());
   } catch {
     redirect('/login');
   }

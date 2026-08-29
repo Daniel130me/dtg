@@ -1,11 +1,13 @@
-const DEFAULT_REDIRECT = "/dashboard";
-
-export function safeRedirectPath(value: string | null | undefined): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return DEFAULT_REDIRECT;
+/**
+ * Validates an untrusted `returnTo` query value and returns a safe in-app path,
+ * or null when absent/unsafe so the caller can pick an appropriate fallback.
+ */
+export function safeRedirectPath(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
   try {
     const url = new URL(value, "http://local.invalid");
-    return url.origin === "http://local.invalid" ? `${url.pathname}${url.search}${url.hash}` : DEFAULT_REDIRECT;
+    return url.origin === "http://local.invalid" ? `${url.pathname}${url.search}${url.hash}` : null;
   } catch {
-    return DEFAULT_REDIRECT;
+    return null;
   }
 }
