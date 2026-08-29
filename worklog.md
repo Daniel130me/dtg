@@ -242,3 +242,19 @@ Stage Summary:
 - Sandbox credentials: owner@dtg.test / (see .env OWNER_PASSWORD), student1@dtg.test / SecurePass123!x
 - Phases 0, 0B, 1, 2, 3 verified working; prototype mock data intact pending Phase 4+ connection
 - Ready to continue with Phase 4 (profile/account lifecycle) per BACKEND_IMPLEMENTATION_PLAN.md
+
+---
+Task ID: 7
+Agent: main-coordinator
+Task: Save engineering instructions, configure commit identity, clean up local commit history
+
+Work Log:
+- Created instruction.md capturing code quality requirements, prohibitions (over-engineering, magic values, hard-coded assumptions), query-performance rule, Conventional Commits standard, and the post-implementation compliance check
+- Configured repo-local git identity: Daniel130me <kosokodaniel@gmail.com>
+- Rebuilt local unpushed history into two clean conventional commits (ebfa1c9 chore(sandbox), 4028169 docs); removed runtime .zscripts/dev.pid from tracking; added tool-results/, upload/, .dbdata to .gitignore
+- Left file-mode-only churn (sandbox mount reports 755) uncommitted to avoid permission noise
+
+Stage Summary:
+- instruction.md is the standing engineering standard for all future work
+- All future commits: Conventional Commits style, authored as Daniel130me
+- Every implementation walkthrough will include a compliance check against instruction.md
