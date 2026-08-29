@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { requireAuthenticatedUserCached } from '@/server/auth/authorization';
+import { Toaster } from '@/components/ui/sonner';
 
 export default async function AuthenticatedStudentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   try {
@@ -9,5 +10,11 @@ export default async function AuthenticatedStudentLayout({ children }: Readonly<
   } catch {
     redirect('/login');
   }
-  return children;
+  return (
+    <>
+      {children}
+      {/* Student surfaces use sonner for enrolment feedback (mirrors the owner layout). */}
+      <Toaster position="bottom-right" richColors />
+    </>
+  );
 }

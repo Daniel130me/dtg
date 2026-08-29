@@ -1,3 +1,6 @@
+// Enrolment API wrappers (client-safe fetch helpers over apiRequest).
+export * from "@/features/learning/api";
+
 export { default as StudentDashboardPage } from "@/components/prototype/pages/student/StudentDashboard";
 export { default as MyLearningPage } from "@/components/prototype/pages/student/MyLearningPage";
 export { default as LearningPlayerPage } from "@/components/prototype/pages/student/LearningPlayerPage";

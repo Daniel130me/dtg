@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Lock, BookOpen, BarChart3, Cloud, Code, Palette, Smartphone } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
+import { ArrowLeft, Clock, Users, Globe, PlayCircle, FileText, HelpCircle, ClipboardList, CheckCircle2, Eye, Lock, BookOpen, BarChart3, Cloud, Code, Palette, Smartphone, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,9 +14,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import StarRating from '@/components/prototype/shared/StarRating';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { fetchCourseDetail } from '@/features/catalog/api';
+import { enrollInCourse, fetchCourseEnrolmentState } from '@/features/learning/api';
 import { ApiClientError } from '@/lib/client/api-client';
+import { authClient } from '@/lib/client/auth-client';
 import { formatCount, formatDuration, formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
 import type { CourseDetailDto, CourseLessonDto } from '@/contracts/catalog';
+import type { CourseEnrolmentStateDto } from '@/contracts/enrolments';
 
 type DetailLessonType = CourseLessonDto['type'];
 
@@ -90,6 +94,7 @@ function DetailSkeleton() {
 
 export default function CourseDetailPage() {
   const params = useParams<{ courseId: string }>();
+  const router = useRouter();
   // The route segment is named `[courseId]` for prototype-historical reasons, but
   // its value is the course SLUG (e.g. /courses/nextjs-masterclass) — the catalog
   // API looks courses up by slug, so we treat it as one.
@@ -128,6 +133,67 @@ export default function CourseDetailPage() {
       cancelled = true;
     };
   }, [slug, requestKey]);
+
+  // --- Enrolment state (Phase 7) -------------------------------------------
+  // authClient.useSession() mirrors navigation.tsx: better-auth fields beyond the
+  // standard user shape would need a cast, but `id` is standard.
+  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const signedInUserId = session?.user?.id ?? null;
+
+  const [enrolmentState, setEnrolmentState] = useState<CourseEnrolmentStateDto | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrolmentLoadedKey, setEnrolmentLoadedKey] = useState<string | null>(null);
+  // Keyed by user so switching accounts re-probes; "signed-out" settles instantly.
+  const enrolmentRequestKey = signedInUserId ? `enrol:${signedInUserId}:${slug}` : 'signed-out';
+  // Only meaningful while signed in; the CTA renders after the course detail settles.
+  const enrolmentLoading =
+    Boolean(signedInUserId) && enrolmentLoadedKey !== enrolmentRequestKey;
+
+  useEffect(() => {
+    // Probe only once the session is known AND the course detail has loaded.
+    if (!signedInUserId || loading) return;
+    let cancelled = false;
+    fetchCourseEnrolmentState(slug)
+      .then((state) => {
+        if (cancelled) return;
+        setEnrolmentState(state);
+        setEnrolmentLoadedKey(enrolmentRequestKey);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // 401 = stale session: leave the state unknown; the CTA falls through to
+        // the not-enrolled branches and a fresh enroll attempt re-routes to
+        // login. Other failures also land on the safe not-enrolled CTA — the
+        // enroll endpoint is idempotent, so this can never double-charge/double-enrol.
+        setEnrolmentLoadedKey(enrolmentRequestKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedInUserId, loading, slug, enrolmentRequestKey]);
+
+  const returnToPath = `/courses/${encodeURIComponent(slug)}`;
+  const loginWithReturnTo = `/login?returnTo=${encodeURIComponent(returnToPath)}`;
+
+  // Idempotent free enrolment: optimistic local state update (no full refetch).
+  const handleEnroll = async () => {
+    if (enrolling) return;
+    setEnrolling(true);
+    try {
+      const enrolment = await enrollInCourse(slug);
+      setEnrolmentState({ enrolled: true, status: enrolment.status });
+      toast.success("You're enrolled");
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.status === 401) {
+        // Session expired mid-flight — finish the enrolment after sign-in.
+        router.push(loginWithReturnTo);
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : 'Enrolment failed. Please try again.');
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   if (loading) return <DetailSkeleton />;
 
@@ -233,17 +299,56 @@ export default function CourseDetailPage() {
                 </div>
                 <p className='text-xs text-muted-foreground mb-5'>30-day money-back guarantee</p>
 
-                {/* Enrolment is a later phase — the CTA is disabled until payments land. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className='block w-full cursor-not-allowed'>
-                      <Button className='w-full' size='lg' disabled>
-                        {course.isFree ? 'Enroll' : 'Enroll Now'}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Enrolment opens soon</TooltipContent>
-                </Tooltip>
+                {/* Enrolment CTA — driven by session + enrolment state (Phase 7). */}
+                {enrolmentState?.enrolled ? (
+                  <div className='space-y-3'>
+                    <div className='flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary'>
+                      <CheckCircle2 className='size-4 shrink-0' />
+                      You&apos;re enrolled in this course
+                    </div>
+                    {/* The lesson player is a later phase — /learning is the honest destination. */}
+                    <Button className='w-full' size='lg' asChild>
+                      <Link href='/learning'>Go to Classroom</Link>
+                    </Button>
+                  </div>
+                ) : sessionPending || enrolmentLoading ? (
+                  /* Course/session/enrolment state still resolving — no behaviour yet. */
+                  <Button className='w-full' size='lg' disabled>
+                    {course.isFree ? 'Enroll' : 'Enroll Now'}
+                  </Button>
+                ) : !signedInUserId ? (
+                  /* Signed out: sign in first, then land back on this course. */
+                  <Button
+                    className='w-full'
+                    size='lg'
+                    onClick={() => router.push(loginWithReturnTo)}
+                  >
+                    {course.isFree ? 'Enroll' : 'Enroll Now'}
+                  </Button>
+                ) : course.isFree ? (
+                  /* Signed in + free course: idempotent one-click enrolment. */
+                  <Button className='w-full' size='lg' onClick={handleEnroll} disabled={enrolling}>
+                    {enrolling ? (
+                      <>
+                        <Loader2 className='size-4 animate-spin' /> Enrolling&hellip;
+                      </>
+                    ) : (
+                      'Enroll'
+                    )}
+                  </Button>
+                ) : (
+                  /* Signed in + paid course: checkout/payments land in a later phase. */
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className='block w-full cursor-not-allowed'>
+                        <Button className='w-full' size='lg' disabled>
+                          Enroll Now
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Paid enrolment is coming soon</TooltipContent>
+                  </Tooltip>
+                )}
 
                 <p className='text-center text-xs text-muted-foreground mt-3'>Includes {course.totalSections} sections &middot; {course.totalLessons} lessons</p>
 
