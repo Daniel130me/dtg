@@ -72,7 +72,18 @@ describe("enrolment wire contracts", () => {
     categorySlug: "web-development",
   };
 
-  it("parses a complete enrolment DTO with nullable dates", () => {
+  const baseEnrolment = {
+    id: "3f2504e0-4f89-11d3-9a0c-0305e82c3302",
+    courseId: course.id,
+    source: "FREE",
+    enrolledAt: "2026-08-29T12:00:00.000Z",
+    completedAt: null,
+    revokedAt: null,
+    course,
+    progress: null,
+  };
+
+  it("parses a complete enrolment DTO with nullable dates and progress", () => {
     const parsed = enrolmentDtoSchema.parse({
       id: "3f2504e0-4f89-11d3-9a0c-0305e82c3302",
       courseId: course.id,
@@ -82,23 +93,24 @@ describe("enrolment wire contracts", () => {
       completedAt: null,
       revokedAt: null,
       course,
+      progress: { completedLessons: 1, totalLessons: 4, progressPercent: 25 },
     });
     assert.equal(parsed.course.categorySlug, "web-development");
     assert.equal(parsed.completedAt, null);
+    assert.equal(parsed.progress?.progressPercent, 25);
+
+    // REVOKED enrolments carry no progress block.
+    const revoked = enrolmentDtoSchema.parse({
+      ...baseEnrolment,
+      status: "REVOKED",
+      progress: null,
+    });
+    assert.equal(revoked.progress, null);
   });
 
   it("rejects unknown enrolment statuses and sources", () => {
-    const base = {
-      id: "3f2504e0-4f89-11d3-9a0c-0305e82c3302",
-      courseId: course.id,
-      source: "FREE",
-      enrolledAt: "2026-08-29T12:00:00.000Z",
-      completedAt: null,
-      revokedAt: null,
-      course,
-    };
-    assert.throws(() => enrolmentDtoSchema.parse({ ...base, status: "PAUSED" }));
-    assert.throws(() => enrolmentDtoSchema.parse({ ...base, status: "ACTIVE", source: "GIFT" }));
+    assert.throws(() => enrolmentDtoSchema.parse({ ...baseEnrolment, status: "PAUSED" }));
+    assert.throws(() => enrolmentDtoSchema.parse({ ...baseEnrolment, status: "ACTIVE", source: "GIFT" }));
   });
 
   it("validates pagination envelopes and state probes", () => {
@@ -111,6 +123,7 @@ describe("enrolment wire contracts", () => {
       completedAt: null,
       revokedAt: null,
       course,
+      progress: { completedLessons: 0, totalLessons: 4, progressPercent: 0 },
     };
     const page = paginatedEnrolmentsSchema.parse({ items: [enrolment], nextCursor: null, total: 1 });
     assert.equal(page.total, 1);
