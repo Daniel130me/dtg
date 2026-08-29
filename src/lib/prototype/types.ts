@@ -15,6 +15,7 @@ export type ViewName =
   | 'course-management'
   | 'student-management'
   | 'analytics'
+  | 'grading'
   | 'create-course';
 
 export interface User {
