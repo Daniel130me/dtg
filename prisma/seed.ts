@@ -38,6 +38,182 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+// ---------------------------------------------------------------------------
+// Assessment seed data (Phase 9).
+//
+// Assessments are keyed by course slug + lesson title because the curriculum
+// above is rebuilt (lessons deleted and recreated) on every seed run, so
+// assessments must be attached AFTER the lesson rows exist. Re-seeding deletes
+// the previous quiz/assignment rows first; their attempt/submission history
+// cascades with them, which is acceptable for deterministic demo content.
+// ---------------------------------------------------------------------------
+
+interface QuizSeed {
+  lessonTitle: string;
+  passPercent: number;
+  maxAttempts: number | null;
+  timeLimitMinutes: number | null;
+  questions: Array<{
+    prompt: string;
+    points: number;
+    explanation: string | null;
+    options: Array<{ text: string; isCorrect: boolean }>;
+  }>;
+}
+
+interface AssignmentSeed {
+  lessonTitle: string;
+  instructions: string;
+  maxPoints: number;
+  dueAt: null;
+  allowResubmission: boolean;
+}
+
+const ASSESSMENT_SEEDS: Record<
+  string,
+  { quiz?: QuizSeed; assignment?: AssignmentSeed }
+> = {
+  "complete-nextjs-react-masterclass": {
+    quiz: {
+      lessonTitle: "Section Quiz: Fundamentals",
+      passPercent: 70,
+      maxAttempts: 3,
+      timeLimitMinutes: 15,
+      questions: [
+        {
+          prompt: "Which directive marks a component as a React Server Component?",
+          points: 1,
+          explanation:
+            "Server Components are the default in the App Router; 'use client' opts a component INTO client rendering, so a Server Component simply omits it.",
+          options: [
+            { text: "'use server'", isCorrect: false },
+            { text: "'use client'", isCorrect: false },
+            { text: "None — components are server components by default in the App Router", isCorrect: true },
+            { text: "'use server component'", isCorrect: false },
+          ],
+        },
+        {
+          prompt: "What does the `c` in the `mcp` App Router convention folder stand for?",
+          points: 1,
+          explanation:
+            "App Router file conventions include page.tsx, layout.tsx, loading.tsx, error.tsx, and not-found.tsx — there is no `mcp` convention.",
+          options: [
+            { text: "Middleware Control Point", isCorrect: false },
+            { text: "This is a trick question — `mcp` is not an App Router convention", isCorrect: true },
+            { text: "Module Cache Provider", isCorrect: false },
+            { text: "Metadata Component Props", isCorrect: false },
+          ],
+        },
+        {
+          prompt: "Which hook is used to read URL search parameters inside a Client Component?",
+          points: 1,
+          explanation:
+            "useSearchParams() reads the current URL's query string in client components; params arrive as route props instead.",
+          options: [
+            { text: "usePathname", isCorrect: false },
+            { text: "useRouter().query", isCorrect: false },
+            { text: "useSearchParams", isCorrect: true },
+            { text: "useQuery", isCorrect: false },
+          ],
+        },
+        {
+          prompt: "When does a Next.js layout re-render its children on navigation?",
+          points: 1,
+          explanation:
+            "Layouts persist across navigations and do not re-render; only their children (the route content) change.",
+          options: [
+            { text: "On every navigation within its segment", isCorrect: false },
+            { text: "Only when the layout module file changes", isCorrect: true },
+            { text: "Whenever a search parameter changes", isCorrect: false },
+            { text: "Every time any page state updates", isCorrect: false },
+          ],
+        },
+        {
+          prompt: "Which caching layer does `revalidatePath` invalidate?",
+          points: 1,
+          explanation:
+            "revalidatePath purges the cached payload for the given path so the next request re-renders it.",
+          options: [
+            { text: "The browser's HTTP cache", isCorrect: false },
+            { text: "The service worker cache", isCorrect: false },
+            { text: "The React state cache", isCorrect: false },
+            { text: "The server-side route cache", isCorrect: true },
+          ],
+        },
+      ],
+    },
+    assignment: {
+      lessonTitle: "Assignment: Build a RSC Dashboard",
+      instructions:
+        "Build a small dashboard page that renders at least one React Server Component fetching data directly from the database, one Client Component with interactive filtering, and one loading.tsx skeleton. Submit a short write-up (200-400 words) describing your component boundaries and where you drew the server/client line, plus a link to your repository.",
+      maxPoints: 100,
+      dueAt: null,
+      allowResubmission: true,
+    },
+  },
+};
+
+async function seedCourseAssessments(
+  courseId: string,
+  seeds: { quiz?: QuizSeed; assignment?: AssignmentSeed },
+): Promise<void> {
+  if (seeds.quiz) {
+    const lesson = await prisma.lesson.findFirst({
+      where: { courseId, title: seeds.quiz.lessonTitle },
+      select: { id: true },
+    });
+    if (!lesson) throw new Error(`Quiz lesson "${seeds.quiz.lessonTitle}" missing for course ${courseId}`);
+    // Attempts cascade with the quiz: dev seed content is rebuilt wholesale.
+    await prisma.quiz.deleteMany({ where: { lessonId: lesson.id } });
+    await prisma.quiz.create({
+      data: {
+        lessonId: lesson.id,
+        courseId,
+        passPercent: seeds.quiz.passPercent,
+        maxAttempts: seeds.quiz.maxAttempts,
+        timeLimitMinutes: seeds.quiz.timeLimitMinutes,
+        questions: {
+          create: seeds.quiz.questions.map((question, questionIndex) => ({
+            position: questionIndex + 1,
+            prompt: question.prompt,
+            points: question.points,
+            explanation: question.explanation,
+            options: {
+              create: question.options.map((option, optionIndex) => ({
+                position: optionIndex + 1,
+                text: option.text,
+                isCorrect: option.isCorrect,
+              })),
+            },
+          })),
+        },
+      },
+      select: { id: true },
+    });
+  }
+
+  if (seeds.assignment) {
+    const lesson = await prisma.lesson.findFirst({
+      where: { courseId, title: seeds.assignment.lessonTitle },
+      select: { id: true },
+    });
+    if (!lesson) throw new Error(`Assignment lesson "${seeds.assignment.lessonTitle}" missing for course ${courseId}`);
+    // Submissions/grades cascade with the assignment (dev seed content).
+    await prisma.assignment.deleteMany({ where: { lessonId: lesson.id } });
+    await prisma.assignment.create({
+      data: {
+        lessonId: lesson.id,
+        courseId,
+        instructions: seeds.assignment.instructions,
+        maxPoints: seeds.assignment.maxPoints,
+        dueAt: seeds.assignment.dueAt,
+        allowResubmission: seeds.assignment.allowResubmission,
+      },
+      select: { id: true },
+    });
+  }
+}
+
 async function seedCategories(): Promise<void> {
   for (const [index, category] of mockCategories.entries()) {
     const slug = slugify(category.name);
@@ -165,6 +341,12 @@ async function seedCourse(course: MockCourse, creatorUserId: string): Promise<vo
     },
     select: { id: true },
   });
+
+  // Assessments attach to freshly rebuilt lesson rows, so they come last.
+  const assessmentSeed = ASSESSMENT_SEEDS[course.slug];
+  if (assessmentSeed) {
+    await seedCourseAssessments(dbCourse.id, assessmentSeed);
+  }
 }
 
 async function main(): Promise<void> {

@@ -125,6 +125,10 @@ model User {
   lessonNotes       LessonNote[]
   discussionThreads DiscussionThread[]
   discussionPosts   DiscussionPost[]
+  quizAttempts          QuizAttempt[]
+  assignmentSubmissions AssignmentSubmission[]
+  gradesGiven           AssignmentGrade[]    @relation("AssignmentGrader")
+  certificates          Certificate[]
 
   @@index([status, createdAt, id])
 }
@@ -325,6 +329,9 @@ model Course {
   lessonProgress  LessonProgress[]
   lessonNotes     LessonNote[]
   discussions     DiscussionThread[]
+  quizzes      Quiz[]
+  assignments  Assignment[]
+  certificates Certificate[]
 
   @@index([status, publishedAt, id])
   @@index([categoryId, status])
@@ -370,6 +377,8 @@ model Lesson {
   progress LessonProgress[]
   notes    LessonNote[]
   threads  DiscussionThread[]
+  quiz       Quiz?
+  assignment Assignment?
 
   @@unique([sectionId, position])
   @@index([courseId, status, position])
@@ -614,4 +623,229 @@ model DiscussionPost {
   user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([threadId, status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Assessments and credentials (Phase 9): quizzes, assignments, grading,
+// certificates.
+//
+// Trust model: the answer key (QuizOption.isCorrect) lives server-side only
+// and is never serialized into a learner DTO before the attempt is submitted
+// (permitted review). Every attempt freezes a JSON snapshot of the exact
+// questions/options it was served, so owner edits can never rewrite the
+// meaning of an in-flight or graded attempt. Answer rows intentionally carry
+// NO foreign keys into QuizQuestion/QuizOption: ids point into the attempt's
+// snapshot, and replacing a quiz's authored content must never cascade-delete
+// a learner's grading history.
+//
+// courseId is denormalized onto attempt/submission rows so canonical
+// certificate eligibility ("every quiz passed, every assignment graded")
+// aggregates per course without joining through lessons.
+// ---------------------------------------------------------------------------
+
+enum QuizAttemptStatus {
+  STARTED
+  SUBMITTED
+  EXPIRED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  RETURNED
+}
+
+enum CertificateStatus {
+  ACTIVE
+  REVOKED
+}
+
+/// One authored quiz per QUIZ lesson. Editing replaces questions/options in a
+/// transaction and bumps `version`; published attempts keep their snapshot.
+model Quiz {
+  id               String   @id @default(uuid()) @db.Uuid
+  lessonId         String   @unique @db.Uuid
+  // Denormalized from the lesson for per-course eligibility aggregation.
+  courseId         String   @db.Uuid
+  version          Int      @default(1)
+  // Minimum percentage (0-100) the submitter must score to pass.
+  passPercent      Int      @default(70)
+  // Maximum attempts per learner; null means unlimited.
+  maxAttempts      Int?
+  // Hard submit deadline per attempt (startedAt + limit); null means untimed.
+  timeLimitMinutes Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  lesson    Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course    Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([courseId])
+}
+
+model QuizQuestion {
+  id          String  @id @default(uuid()) @db.Uuid
+  quizId      String  @db.Uuid
+  position    Int
+  prompt      String  @db.VarChar(1000)
+  points      Int     @default(1)
+  // Shown to the learner only in post-submission review.
+  explanation String? @db.VarChar(2000)
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options QuizOption[]
+
+  @@unique([quizId, position])
+  @@index([quizId])
+}
+
+model QuizOption {
+  id        String  @id @default(uuid()) @db.Uuid
+  questionId String @db.Uuid
+  position  Int
+  text      String  @db.VarChar(500)
+  // Answer key. Server-side only: excluded from every pre-submission payload.
+  isCorrect Boolean @default(false)
+
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, position])
+  @@index([questionId])
+}
+
+/// One attempt per start. `questionSnapshot` freezes the served quiz (prompt,
+/// points, explanation, options with the answer key) server-side; learners
+/// answered exactly what the snapshot records.
+model QuizAttempt {
+  id            String            @id @default(uuid()) @db.Uuid
+  quizId        String            @db.Uuid
+  // Denormalized for per-course eligibility queries.
+  courseId      String            @db.Uuid
+  userId        String            @db.Uuid
+  attemptNumber Int
+  status        QuizAttemptStatus @default(STARTED)
+  // Immutable server-side snapshot of questions/options (incl. answer key).
+  // Never serialized to the client as-is.
+  questionSnapshot Json
+  // Set from the quiz's time limit at start; late submissions are rejected.
+  submitDeadline   DateTime?
+  submittedAt      DateTime?
+  scorePoints      Int?
+  maxPoints        Int?
+  scorePercent     Int?
+  passed           Boolean?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@unique([quizId, userId, attemptNumber])
+  @@index([userId, courseId, status, passed])
+  @@index([quizId, userId, status])
+}
+
+/// A per-question selection inside an attempt. questionId/optionId reference
+/// the attempt's snapshot (plain strings, no FK by design — see the module
+/// comment above).
+model QuizAnswer {
+  id         String  @id @default(uuid()) @db.Uuid
+  attemptId  String  @db.Uuid
+  questionId String  @db.VarChar(64)
+  optionId   String? @db.VarChar(64)
+  // Verdict frozen at submit time so later quiz edits never rewrite review.
+  isCorrect  Boolean @default(false)
+
+  attempt QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+}
+
+/// One assignment brief per ASSIGNMENT lesson.
+model Assignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  lessonId     String    @unique @db.Uuid
+  // Denormalized from the lesson for per-course eligibility aggregation.
+  courseId     String    @db.Uuid
+  instructions String    @db.VarChar(10000)
+  maxPoints    Int       @default(100)
+  // Hard deadline for new submissions; null means open-ended.
+  dueAt        DateTime?
+  // When false, exactly one submission is accepted per learner.
+  allowResubmission Boolean @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lesson      Lesson                 @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions AssignmentSubmission[]
+
+  @@index([courseId])
+}
+
+model AssignmentSubmission {
+  id            String           @id @default(uuid()) @db.Uuid
+  assignmentId  String           @db.Uuid
+  // Denormalized for per-course eligibility queries.
+  courseId      String           @db.Uuid
+  userId        String           @db.Uuid
+  attemptNumber Int
+  status        SubmissionStatus @default(SUBMITTED)
+  // Phase 9 deviation: the media module (Phase 5) is not built yet, so
+  // submissions are text plus an optional external link. The column shape
+  // keeps a verified MediaAsset reference drop-in for the media phase.
+  body          String           @db.VarChar(20000)
+  attachmentUrl String?          @db.VarChar(2048)
+  submittedAt   DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  assignment Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grades     AssignmentGrade[]
+
+  @@unique([assignmentId, userId, attemptNumber])
+  @@index([assignmentId, status, submittedAt])
+  @@index([userId, courseId, status])
+}
+
+/// Grading history: every grade event appends a row; the latest row is the
+/// learner-facing grade. Re-grading never rewrites history. maxPoints is
+/// snapshotted at grade time so later brief edits cannot reinterpret a score.
+model AssignmentGrade {
+  id             String   @id @default(uuid()) @db.Uuid
+  submissionId   String   @db.Uuid
+  score          Int
+  maxPoints      Int
+  feedback       String?  @db.VarChar(5000)
+  gradedByUserId String?  @db.Uuid
+  createdAt      DateTime @default(now())
+
+  submission AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  gradedBy   User?                @relation("AssignmentGrader", fields: [gradedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId, createdAt])
+}
+
+/// Issued at most once per learner per course (`userId, courseId` unique);
+/// `code` is the public high-entropy verification reference carrying no
+/// personal information.
+model Certificate {
+  id        String            @id @default(uuid()) @db.Uuid
+  code      String            @unique @db.VarChar(32)
+  userId    String            @db.Uuid
+  courseId  String            @db.Uuid
+  status    CertificateStatus @default(ACTIVE)
+  issuedAt  DateTime          @default(now())
+  revokedAt DateTime?
+  revokedReason String?       @db.VarChar(500)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([courseId, status, issuedAt])
 }
