@@ -433,6 +433,298 @@ export const openApiDocument = {
         },
       },
     },
+    // ------------------------------------------------------------------
+    // Phase 9: quizzes, assignments, grading, and certificates.
+    // ------------------------------------------------------------------
+    "/owner/lessons/{lessonId}/quiz": {
+      get: {
+        operationId: "getQuizAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Quiz authoring view with the answer key (or null when none is configured)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "The lesson does not exist." },
+        },
+      },
+      put: {
+        operationId: "updateQuizAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Quiz replaced transactionally; version bumped; published attempts keep their snapshots." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "The lesson does not exist or is not a QUIZ lesson." },
+          "422": { description: "Authoring validation failed (e.g. a question without a correct option)." },
+        },
+      },
+      delete: {
+        operationId: "deleteQuizAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Quiz detached from the lesson (idempotent)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}/assignment": {
+      get: {
+        operationId: "getAssignmentAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Assignment authoring view (or null when none is configured)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "The lesson does not exist." },
+        },
+      },
+      put: {
+        operationId: "updateAssignmentAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Assignment brief saved." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "The lesson does not exist or is not an ASSIGNMENT lesson." },
+          "422": { description: "Authoring validation failed." },
+        },
+      },
+      delete: {
+        operationId: "deleteAssignmentAuthoring",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Assignment detached from the lesson (idempotent)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/quiz": {
+      get: {
+        operationId: "getQuizLearnerView",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Quiz structure (sanitized: no answer key) with the caller's attempt state." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or has no quiz." },
+          "422": { description: "Not enrolled in the lesson's course." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/quiz/attempts": {
+      post: {
+        operationId: "startQuizAttempt",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Attempt started (or the in-flight attempt resumed) with sanitized snapshot questions." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or has no quiz." },
+          "422": { description: "Not enrolled, or the attempt limit is reached." },
+        },
+      },
+    },
+    "/learning/quiz/attempts/{attemptId}": {
+      get: {
+        operationId: "getQuizAttemptResult",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "attemptId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Submitted attempt review with per-question correctness." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Attempt not found or not owned by the caller." },
+          "422": { description: "The attempt has not been submitted yet." },
+        },
+      },
+    },
+    "/learning/quiz/attempts/{attemptId}/submit": {
+      post: {
+        operationId: "submitQuizAttempt",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "attemptId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Attempt scored server-side; review payload returned." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Attempt not found or not owned by the caller." },
+          "422": { description: "Already submitted, the deadline has passed, or body validation failed." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/assignment": {
+      get: {
+        operationId: "getAssignmentLearnerView",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Assignment brief with the caller's submissions and grades." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or has no assignment." },
+          "422": { description: "Not enrolled in the lesson's course." },
+        },
+      },
+    },
+    "/learning/lessons/{lessonId}/assignment/submissions": {
+      post: {
+        operationId: "createAssignmentSubmission",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Submission recorded." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The lesson does not exist or has no assignment." },
+          "422": { description: "Not enrolled, deadline passed, resubmission not allowed, or body validation failed." },
+        },
+      },
+    },
+    "/owner/grading/submissions": {
+      get: {
+        operationId: "listGradingQueue",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "status", in: "query", schema: { type: "string", enum: ["SUBMITTED", "GRADED", "RETURNED"] } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated assignment submissions (newest first)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/grading/submissions/{submissionId}": {
+      get: {
+        operationId: "getGradingDetail",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "submissionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Submission detail with the full grade history." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Submission not found." },
+        },
+      },
+    },
+    "/owner/grading/submissions/{submissionId}/grade": {
+      post: {
+        operationId: "gradeSubmission",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "submissionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Grade recorded (appended history); submission marked graded." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Submission not found." },
+          "422": { description: "Score out of range or body validation failed." },
+        },
+      },
+    },
+    "/learning/certificates": {
+      get: {
+        operationId: "listMyCertificates",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Issued certificates plus completed courses that are still claimable." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/courses/{slug}/certificate": {
+      post: {
+        operationId: "issueMyCertificate",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "slug", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "Certificate issued (idempotent: an existing one is returned unchanged)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Course not found or not published." },
+          "422": { description: "Certificate eligibility is not met yet." },
+        },
+      },
+    },
+    "/learning/certificates/{certificateId}/download": {
+      get: {
+        operationId: "downloadMyCertificate",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "certificateId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "PDF download (application/pdf attachment) of the caller's certificate." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Certificate not found or not owned by the caller." },
+          "422": { description: "The certificate has been revoked." },
+        },
+      },
+    },
+    "/owner/certificates/{certificateId}/revoke": {
+      post: {
+        operationId: "revokeCertificate",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "certificateId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Certificate revoked; public verification reflects the revoked status." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Certificate not found." },
+          "422": { description: "Body validation failed or already revoked." },
+        },
+      },
+    },
+    "/certificates/{code}": {
+      get: {
+        operationId: "verifyCertificate",
+        parameters: [
+          { name: "code", in: "path", required: true, schema: { type: "string", minLength: 6, maxLength: 32 } },
+        ],
+        responses: {
+          "200": { description: "Minimal public verification payload (no email; display name and course title only)." },
+          "404": { description: "No certificate carries this code." },
+          "422": { description: "Code validation failed." },
+        },
+      },
+    },
     "/owner/courses": {
       get: {
         operationId: "listOwnerCourses",
