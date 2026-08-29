@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from "@/server/auth/password";
 import { issueEmailVerificationToken } from "@/server/auth/email-verification-token";
+import { logger } from "@/server/observability/logger";
 
 const env = getServerEnv();
 const DAY_IN_SECONDS = 24 * 60 * 60;
@@ -22,6 +23,22 @@ export function createAuthService(
   database: PrismaClient = db,
   sendEmail: (input: AuthenticationEmailInput) => Promise<void> = sendAuthenticationEmail,
 ) {
+  // Auth transactions must survive SMTP failures: verification tokens are
+  // persisted before the send, and sendOnSignIn retries delivery later. A
+  // throwing hook would abort sign-up between user and credential creation,
+  // leaving an account that can never sign in.
+  async function sendEmailSafely(input: AuthenticationEmailInput): Promise<void> {
+    try {
+      await sendEmail(input);
+    } catch (error) {
+      logger.error("Authentication email delivery failed", {
+        to: input.to,
+        subject: input.subject,
+        error,
+      });
+    }
+  }
+
   return betterAuth({
     appName: "DTG",
     baseURL: env.APP_URL,
@@ -63,7 +80,7 @@ export function createAuthService(
         });
       },
       sendResetPassword: async ({ user, url }) => {
-        await sendEmail({
+        await sendEmailSafely({
           to: user.email,
           subject: "Reset your DTG password",
           intro: "A password reset was requested for your DTG account.",
@@ -79,7 +96,7 @@ export function createAuthService(
       expiresIn: 60 * 60,
       sendVerificationEmail: async ({ user, url, token }) => {
         await issueEmailVerificationToken(database, user.email, token);
-        await sendEmail({
+        await sendEmailSafely({
           to: user.email,
           subject: "Verify your DTG email",
           intro: "Confirm your email address to activate your DTG account.",
