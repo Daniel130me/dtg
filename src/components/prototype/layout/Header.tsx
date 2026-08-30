@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { GraduationCap, Menu, Bell, LogOut, User, LayoutDashboard, BookOpen, ChevronDown } from 'lucide-react';
+import { GraduationCap, Menu, LogOut, User, LayoutDashboard, BookOpen, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import NotificationsBell from '@/components/prototype/layout/NotificationsBell';
 import { useNav } from '@/lib/prototype/navigation';
-import { notifications } from '@/lib/prototype/mock-data';
 import type { ViewName } from '@/lib/prototype/types';
 
 const navLinks = [
@@ -21,7 +20,6 @@ const navLinks = [
 export default function Header() {
   const { currentView, navigate, isAuthenticated, userRole, userName, logout } = useNav();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const unreadCount = notifications.filter(n => !n.isRead).length;
   const initials = userName
     ?.split(/\s+/)
     .filter(Boolean)
@@ -69,32 +67,8 @@ export default function Header() {
         <div className='flex items-center gap-2'>
           {isAuthenticated ? (
             <>
-              {/* Notification Bell */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' size='icon' className='relative' aria-label='Open notifications'>
-                    <Bell className='size-5' />
-                    {unreadCount > 0 && (
-                      <span className='absolute -top-0.5 -right-0.5 size-4.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center'>
-                        {unreadCount}
-                      </span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='end' className='w-80'>
-                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {notifications.slice(0, 4).map((n) => (
-                    <DropdownMenuItem key={n.id} className='flex flex-col items-start gap-1 p-3 cursor-pointer'>
-                      <div className='flex items-center gap-2 w-full'>
-                        <span className={`size-2 rounded-full shrink-0 ${n.isRead ? 'bg-transparent' : 'bg-primary'}`} />
-                        <span className='text-sm font-medium'>{n.title}</span>
-                      </div>
-                      <p className='text-xs text-muted-foreground pl-4'>{n.message}</p>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Notification bell — live inbox (Phase 10), auth-gated inside. */}
+              <NotificationsBell />
 
               {/* User Avatar Dropdown */}
               <DropdownMenu>

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   BookOpen,
   Award,
+  Bell,
   UserCircle,
   ArrowLeft,
   GraduationCap,
@@ -24,6 +25,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', view: 'student-dashboard', icon: <LayoutDashboard className="size-5" /> },
   { label: 'My Learning', view: 'my-learning', icon: <BookOpen className="size-5" /> },
   { label: 'Certificates', view: 'certificates', icon: <Award className="size-5" /> },
+  { label: 'Notifications', view: 'notifications', icon: <Bell className="size-5" /> },
   { label: 'Profile', view: 'profile', icon: <UserCircle className="size-5" /> },
 ];
 
