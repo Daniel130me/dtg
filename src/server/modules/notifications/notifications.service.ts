@@ -52,7 +52,7 @@ export async function listNotifications(userId: string, input: unknown): Promise
   const where: Prisma.NotificationWhereInput = {
     userId,
     // unreadOnly filters the PAGE only; the unread badge stays global.
-    ...(query.unreadOnly ? { readAt: null } : {}),
+    ...(query.unreadOnly === "true" ? { readAt: null } : {}),
   };
   if (query.cursor) {
     const cursor = decodeCursor(query.cursor);

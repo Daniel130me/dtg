@@ -29,10 +29,9 @@ export const notificationListQuerySchema = z.object({
     .max(NOTIFICATION_PAGE_LIMIT_MAX)
     .default(NOTIFICATION_PAGE_LIMIT_DEFAULT),
   // "true" restricts the page to unread rows (newest first either way).
-  unreadOnly: z
-    .enum(["true", "false"])
-    .optional()
-    .transform((value) => value === "true"),
+  // Kept a raw string enum (no transform): services re-parse query data, and
+  // a transformed boolean would fail the second parse.
+  unreadOnly: z.enum(["true", "false"]).optional(),
 });
 
 // ---------------------------------------------------------------------------
