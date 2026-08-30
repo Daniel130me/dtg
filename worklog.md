@@ -837,3 +837,25 @@ Stage Summary:
 - UX honesty rules that carried from the plan: no fabricated deltas, nulls render as em dash, empty states explicit, totals come from the server (never client counts)
 - Exit gate holds: metrics have formulas (docs/ANALYTICS_METRICS.md) AND deterministic fixtures (50 new tests); dashboard latency well inside budget (180ms-1.8s per request on Neon incl. compile)
 - Next: Phase 12 - observability, resilience, privacy, and release
+
+---
+Task ID: 12-foundation
+Agent: main-coordinator
+Task: Phase 12 kickoff - observability, resilience, privacy, and release hardening
+
+Work Log:
+- Reconciled session state: the continuation summary claiming "Phase 8 pending" was stale; plan checkboxes + worklog prove Phases 8-11 COMPLETE (learning progress/notes/discussions included; StudentDashboard already real-data via fetchLearnerDashboard)
+- Read plan Phase 12 (14 unchecked items), worklog tail ("Next: Phase 12"), and current infra: logger.ts (key-based redaction), request-context.ts (x-request-id), executeRoute (per-request logging), health/live + health/ready (DB-only), db/retry.ts (fixed-delay P1001 retry), email-port (pooled SMTP, no timeout), Flutterwave provider (no timeout/retry), outbox dispatcher (single-process claim)
+- Discovered PHASE 4 GAP: Profiles/preferences/account lifecycle items all unchecked; no src/server/modules/accounts; ProfilePage.tsx still imports mock-data (currentUser/enrolments/certificates); AboutPage imports instructor/testimonials from mock-data; Footer imports categories from mock-data
+- Schema audit: Profile model exists (displayName, countryCode, bio, locale, timezone, avatarKey) from foundation migration; UserStatus.DELETED exists; no notification-preference storage -> additive Json column planned
+- Phase 12 workstream decomposition and dispatch:
+  - 12-a accounts: profile read/update (allowlist + locale en/fr/es), notification prefs (Profile.notificationPrefs Json), password change (current-password verify + revoke other sessions), account data export (JSON), account deletion/anonymization (transactional, owner self-delete guarded, audited) + ProfilePage rewrite with real API + tests
+  - 12-b observability: error monitor (release id + env separation + PII redaction), metrics registry + owner-only /api/v1/metrics + /api/v1/health/diagnostics (DB latency, SMTP/R2/payments config, outbox/webhook lag, job failures), span logging helper, resilience utils (timeout/retry-with-jitter/circuit breaker) applied to SMTP + Flutterwave, graceful shutdown via instrumentation.ts + process handlers, wiring into executeRoute/rate-limit/webhook/outbox + tests
+  - 12-c docs+cleanup: RECOVERY_RUNBOOK.md (Neon PITR + R2 policy), MIGRATION_RUNBOOK.md, PRIVACY.md, AboutPage/Footer mock-data removal via static content module / Footer real categories
+  - Wave 2 after a+b: 12-d security/load/smoke/dependency-audit; 12-e OPERATIONS_HANDBOOK.md + plan checkbox updates
+- Set git core.fileMode=false (123 spurious mode-change entries, 0 content diff)
+
+Stage Summary:
+- Phase 12 in progress: 3 parallel subagents dispatched (12-a, 12-b, 12-c); Wave 2 planned
+- Constraints handed to agents: no `next build` (dev server owns :3000), lint+typecheck+scoped tests only, commits as Daniel130me <kosokodaniel@gmail.com> with Conventional Commits, tests must be provider-independent (no live DB dependency), no blue/indigo UI
+- Deviation policy (to be documented): Sentry/OTel-collector are external services - seams implemented in-repo with attachment documented in runbooks; R2 lifecycle + Neon PITR are console-side settings documented in RECOVERY_RUNBOOK.md; avatar upload stays initials-based (no R2 configured)

@@ -158,6 +158,20 @@ function OwnReviewCard({ slug, onReviewChanged, loginHref }: OwnReviewCardProps)
   const [mineLoadedKey, setMineLoadedKey] = useState<string | null>(null);
   const mineLoading = mineLoadedKey !== mineRequestKey;
 
+  // Form state. Declared BEFORE the prefill probe so the probe's async
+  // callbacks reference already-declared setters (react-hooks/immutability).
+  // The prefill itself is applied in the probe's async callback below, never
+  // during render (house rule: state writes live in async callbacks).
+  const [rating, setRating] = useState(0);
+  const [body, setBody] = useState('');
+  const [prefilledId, setPrefilledId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  // 401 mid-write: the session died; swap the form for a sign-in prompt.
+  const [needsAuth, setNeedsAuth] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     fetchMyReview(slug)
@@ -188,18 +202,6 @@ function OwnReviewCard({ slug, onReviewChanged, loginHref }: OwnReviewCardProps)
       cancelled = true;
     };
   }, [mineRequestKey, slug]);
-
-  // Form state. The prefill is applied in the probe's async callback above,
-  // never during render (house rule: state writes live in async callbacks).
-  const [rating, setRating] = useState(0);
-  const [body, setBody] = useState('');
-  const [prefilledId, setPrefilledId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  // 401 mid-write: the session died; swap the form for a sign-in prompt.
-  const [needsAuth, setNeedsAuth] = useState(false);
 
   const hasExisting = mine !== null;
 
