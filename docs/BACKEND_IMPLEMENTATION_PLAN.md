@@ -572,21 +572,21 @@ Exit gate:
 
 Goal: implement the remaining engagement and operational workflows.
 
-- [ ] Implement verified-enrolment review creation/update, owner moderation, rating aggregation, and owner replies.
+- [x] Implement verified-enrolment review creation/update, owner moderation, rating aggregation, and owner replies.
   Commit: `feat(reviews): add verified course reviews`
-- [ ] Add transactional aggregate maintenance or safe async recomputation for course rating/count.
+- [x] Add transactional aggregate maintenance or safe async recomputation for course rating/count.
   Commit: `perf(reviews): add consistent rating aggregates`
-- [ ] Implement persisted in-app notifications with cursor pagination, mark-read, and mark-all-read.
+- [x] Implement persisted in-app notifications with cursor pagination, mark-read, and mark-all-read.
   Commit: `feat(notifications): add in-app notification endpoints`
-- [ ] Add an email-provider port, templated transactional emails, suppression handling, and safe retry behavior.
+- [x] Add an email-provider port, templated transactional emails, suppression handling, and safe retry behavior.
   Commit: `feat(email): add transactional email delivery`
-- [ ] Connect outbox events to verification, recovery, enrolment, grading, discussion, and certificate messages.
+- [x] Connect outbox events to verification, recovery, enrolment, grading, discussion, and certificate messages.
   Commit: `feat(notifications): connect domain notification workflows`
-- [ ] Implement contact submission with validation, aggressive rate limiting, spam controls, retention, and support notification.
+- [x] Implement contact submission with validation, aggressive rate limiting, spam controls, retention, and support notification.
   Commit: `feat(support): add protected contact workflow`
-- [ ] Connect review, notification, and contact interfaces with optimistic UI only where server reconciliation is defined.
+- [x] Connect review, notification, and contact interfaces with optimistic UI only where server reconciliation is defined.
   Commit: `feat(frontend-engagement): connect engagement workflows`
-- [ ] Add review-abuse, notification ownership, email retry, and contact-spam tests.
+- [x] Add review-abuse, notification ownership, email retry, and contact-spam tests.
   Commit: `test(engagement): cover reviews notifications and support`
 
 Exit gate:
