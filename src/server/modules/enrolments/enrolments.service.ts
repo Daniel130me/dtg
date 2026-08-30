@@ -93,7 +93,9 @@ function toEnrolmentProgress(
 async function getCourseForEnrolment(slug: string) {
   const course = await db.course.findUnique({
     where: { slug },
-    select: { id: true, title: true, status: true, priceMinor: true },
+    // slug is carried for the enrolment.confirmed outbox payload (the
+    // notification needs the classroom deep link).
+    select: { id: true, title: true, slug: true, status: true, priceMinor: true },
   });
   if (!course) throw new ApiError(404, "COURSE_NOT_FOUND", "The requested course does not exist.");
   return course;
@@ -176,6 +178,28 @@ export async function enrollInFreeCourse(userId: string, slug: string, requestId
       data: { enrollmentCount: { increment: 1 } },
       select: { id: true },
     });
+
+    // Phase 10: the enrolment confirmation notification + email are projected
+    // from the outbox by the notifications dispatcher instead of being sent
+    // inline, so enrolment writes never wait on SMTP. The unique eventKey
+    // keeps a retried request from duplicating the projection.
+    await tx.outboxEvent.create({
+      data: {
+        eventKey: `enrolment.confirmed:${created.id}`,
+        topic: "enrolment.confirmed",
+        aggregateType: "Enrolment",
+        aggregateId: created.id,
+        payload: {
+          enrolmentId: created.id,
+          userId,
+          courseId: course.id,
+          courseTitle: course.title,
+          courseSlug: course.slug,
+        },
+      },
+      select: { id: true },
+    });
+
     await tx.auditLog.create({
       data: {
         actorUserId: userId,

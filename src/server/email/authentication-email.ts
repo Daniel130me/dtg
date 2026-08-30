@@ -1,36 +1,14 @@
-import nodemailer, { type Transporter } from "nodemailer";
-import { getServerEnv } from "@/server/config/env";
+import { escapeHtml } from "@/server/email/email.logic";
+import {
+  resetSmtpEmailPortForTests,
+  sendWithSuppressionCheck,
+} from "@/server/email/email-port";
 
-let transporter: Transporter | undefined;
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "'": "&#39;",
-    '"': "&quot;",
-  })[character] ?? character);
-}
-
-function getTransporter(): Transporter {
-  if (transporter) return transporter;
-
-  const env = getServerEnv();
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) {
-    throw new Error("SMTP is not configured.");
-  }
-
-  transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_PORT === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
-    pool: true,
-    maxConnections: 3,
-  });
-  return transporter;
-}
+// Authentication emails (verification + password reset). The transport,
+// suppression check and error classification now live behind the shared
+// email port; this module only keeps its historical message formatting so
+// existing auth flows behave exactly as before (auth.ts already soft-fails
+// delivery errors via its sendEmailSafely wrapper).
 
 export interface AuthenticationEmailInput {
   to: string;
@@ -41,17 +19,13 @@ export interface AuthenticationEmailInput {
 }
 
 export async function sendAuthenticationEmail(input: AuthenticationEmailInput): Promise<void> {
-  if (process.env.NODE_ENV === "test") return;
-
-  const env = getServerEnv();
-  if (!env.EMAIL_FROM) throw new Error("EMAIL_FROM is not configured.");
-
   const safeIntro = escapeHtml(input.intro);
   const safeLabel = escapeHtml(input.actionLabel);
   const safeUrl = escapeHtml(input.actionUrl);
 
-  await getTransporter().sendMail({
-    from: env.EMAIL_FROM,
+  // The port keeps the historical test-environment no-op (no db, no SMTP) and
+  // never lets an email failure roll back the surrounding auth flow.
+  await sendWithSuppressionCheck({
     to: input.to,
     subject: input.subject,
     text: `${input.intro}\n\n${input.actionLabel}: ${input.actionUrl}\n\nIf you did not request this, you can ignore this email.`,
@@ -60,5 +34,5 @@ export async function sendAuthenticationEmail(input: AuthenticationEmailInput): 
 }
 
 export function resetEmailTransportForTests(): void {
-  transporter = undefined;
+  resetSmtpEmailPortForTests();
 }

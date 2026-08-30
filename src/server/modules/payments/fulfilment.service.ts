@@ -139,6 +139,33 @@ export async function fulfilPaidOrder(input: FulfilPaymentInput): Promise<Fulfil
           },
           select: { id: true },
         });
+        // Phase 10: mirror the free-enrolment outbox emission so purchased
+        // learners get the same confirmation notification + email. The order
+        // items only carry the course id, so title/slug are resolved within
+        // the transaction (one read per first-time enrolment — purchase
+        // fulfilment is rare relative to the value of a correct payload).
+        const course = await tx.course.findUnique({
+          where: { id: item.courseId },
+          select: { title: true, slug: true },
+        });
+        if (course) {
+          await tx.outboxEvent.create({
+            data: {
+              eventKey: `enrolment.confirmed:${created.id}`,
+              topic: "enrolment.confirmed",
+              aggregateType: "Enrolment",
+              aggregateId: created.id,
+              payload: {
+                enrolmentId: created.id,
+                userId: order.userId,
+                courseId: item.courseId,
+                courseTitle: course.title,
+                courseSlug: course.slug,
+              },
+            },
+            select: { id: true },
+          });
+        }
         // Denormalized counter only ever increments on first-time enrolment.
         await tx.course.update({
           where: { id: item.courseId },
