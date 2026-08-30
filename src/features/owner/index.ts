@@ -5,3 +5,4 @@ export { default as OwnerAnalyticsPage } from "@/components/prototype/pages/inst
 export { default as CreateCoursePage } from "@/components/prototype/pages/instructor/CreateCoursePage";
 export { default as CourseEditorPage } from "@/components/prototype/pages/instructor/CourseEditorPage";
 export { default as GradingQueuePage } from "@/components/prototype/pages/instructor/GradingQueuePage";
+export { default as ReviewsModerationPage } from "@/components/prototype/pages/instructor/ReviewsModerationPage";

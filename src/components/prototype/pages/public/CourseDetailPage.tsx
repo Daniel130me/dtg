@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import StarRating from '@/components/prototype/shared/StarRating';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
+import CourseReviewsSection from '@/components/prototype/pages/public/CourseReviewsSection';
 import { fetchCourseDetail } from '@/features/catalog/api';
 import { enrollInCourse, fetchCourseEnrolmentState, reconcileOrder, startCheckout } from '@/features/learning/api';
 import { ApiClientError } from '@/lib/client/api-client';
@@ -632,6 +633,17 @@ export default function CourseDetailPage() {
           </Card>
         )}
       </section>
+
+      {/* Reviews (Phase 10): aggregate + paginated VISIBLE list + own-review
+          affordance for enrolled learners. Sits after the curriculum, before
+          the instructor card. */}
+      <CourseReviewsSection
+        slug={slug}
+        ratingAverage={course.ratingAverage}
+        ratingCount={course.ratingCount}
+        enrolled={enrolmentState?.enrolled ?? false}
+        loginHref={loginWithReturnTo}
+      />
 
       {/* Instructor Card */}
       <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16'>

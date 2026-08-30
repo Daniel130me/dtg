@@ -32,12 +32,14 @@ const VIEW_ROUTES: Record<ViewName, string> = {
   'my-learning': '/learning',
   'learning-player': '/learning/course-1/les-1',
   certificates: '/certificates',
+  notifications: '/notifications',
   profile: '/profile',
   'instructor-dashboard': '/owner',
   'course-management': '/owner/courses',
   'student-management': '/owner/students',
   analytics: '/owner/analytics',
   grading: '/owner/grading',
+  reviews: '/owner/reviews',
   'create-course': '/owner/courses/new',
 };
 
@@ -53,6 +55,7 @@ function resolveView(pathname: string): ViewName {
   if (pathname === '/learning') return 'my-learning';
   if (pathname.startsWith('/learning/')) return 'learning-player';
   if (pathname === '/certificates') return 'certificates';
+  if (pathname === '/notifications') return 'notifications';
   if (pathname === '/profile') return 'profile';
   if (pathname === '/owner') return 'instructor-dashboard';
   if (pathname === '/owner/courses/new') return 'create-course';
@@ -60,6 +63,7 @@ function resolveView(pathname: string): ViewName {
   if (pathname === '/owner/students') return 'student-management';
   if (pathname === '/owner/analytics') return 'analytics';
   if (pathname === '/owner/grading') return 'grading';
+  if (pathname === '/owner/reviews') return 'reviews';
   return 'home';
 }
 

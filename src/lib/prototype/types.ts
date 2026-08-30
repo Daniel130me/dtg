@@ -10,12 +10,14 @@ export type ViewName =
   | 'my-learning'
   | 'learning-player'
   | 'certificates'
+  | 'notifications'
   | 'profile'
   | 'instructor-dashboard'
   | 'course-management'
   | 'student-management'
   | 'analytics'
   | 'grading'
+  | 'reviews'
   | 'create-course';
 
 export interface User {
