@@ -626,33 +626,33 @@ Exit gate:
 
 Goal: prove the backend can be operated safely in production.
 
-- [ ] Add application error monitoring with source maps, release identifiers, environment separation, and PII redaction.
+- [x] Add application error monitoring with source maps, release identifiers, environment separation, and PII redaction.
   Commit: `feat(observability): add production error monitoring`
-- [ ] Add OpenTelemetry traces across HTTP, database, R2, payment, email, and job boundaries.
+- [x] Add OpenTelemetry traces across HTTP, database, R2, payment, email, and job boundaries.
   Commit: `feat(observability): add distributed tracing`
-- [ ] Add service-level metrics and alerts for error rate, latency, auth abuse, DB saturation, webhook lag, outbox lag, job failures, and R2 failures.
+- [x] Add service-level metrics and alerts for error rate, latency, auth abuse, DB saturation, webhook lag, outbox lag, job failures, and R2 failures.
   Commit: `feat(observability): add backend metrics and alerts`
-- [ ] Add liveness, readiness, and dependency diagnostics with access controls appropriate to each endpoint.
+- [x] Add liveness, readiness, and dependency diagnostics with access controls appropriate to each endpoint.
   Commit: `feat(health): add production health diagnostics`
-- [ ] Add graceful shutdown, bounded provider timeouts, retry policies with jitter, and circuit-breaking where measured failure modes justify it.
+- [x] Add graceful shutdown, bounded provider timeouts, retry policies with jitter, and circuit-breaking where measured failure modes justify it.
   Commit: `feat(resilience): harden external dependency handling`
-- [ ] Define Neon backup/PITR settings, R2 lifecycle/versioning policy, recovery objectives, and a tested restore runbook.
+- [x] Define Neon backup/PITR settings, R2 lifecycle/versioning policy, recovery objectives, and a tested restore runbook.
   Commit: `docs(recovery): add backup and restore runbook`
-- [ ] Implement retention, user data export, deletion/anonymization, and privacy audit procedures.
+- [x] Implement retention, user data export, deletion/anonymization, and privacy audit procedures.
   Commit: `feat(privacy): add data lifecycle workflows`
-- [ ] Add migration deployment checks, expand-and-contract guidance, and rollback/forward-fix runbooks.
+- [x] Add migration deployment checks, expand-and-contract guidance, and rollback/forward-fix runbooks.
   Commit: `docs(db): add production migration runbook`
-- [ ] Add load tests for catalog, login, dashboard, progress writes, presigning, checkout, and webhooks using production-like data.
+- [x] Add load tests for catalog, login, dashboard, progress writes, presigning, checkout, and webhooks using production-like data.
   Commit: `test(performance): add backend load test suite`
-- [ ] Add security tests for OWASP API risks, broken object-level authorization, mass assignment, CSRF, SSRF, injection, upload abuse, and secret leakage.
+- [x] Add security tests for OWASP API risks, broken object-level authorization, mass assignment, CSRF, SSRF, injection, upload abuse, and secret leakage.
   Commit: `test(security): add backend abuse test suite`
-- [ ] Run a dependency/license audit and resolve launch-blocking findings.
+- [x] Run a dependency/license audit and resolve launch-blocking findings.
   Commit: `chore(security): resolve release dependency findings`
-- [ ] Add a production smoke test and post-deployment verification script.
+- [x] Add a production smoke test and post-deployment verification script.
   Commit: `test(release): add production smoke checks`
-- [ ] Remove prototype authentication/mock data paths only after all screens use real contracts.
+- [x] Remove prototype authentication/mock data paths only after all screens use real contracts.
   Commit: `refactor(prototype): remove mock backend dependencies`
-- [ ] Publish the final API, operations, incident-response, and reviewer documentation.
+- [x] Publish the final API, operations, incident-response, and reviewer documentation.
   Commit: `docs(release): publish backend operations handbook`
 
 Exit gate:

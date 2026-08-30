@@ -97,7 +97,7 @@ interface RequestSpec {
 }
 
 function scenarioRequest(scenario: string, base: string, session: LoginSession | null): RequestSpec {
-  const cookieHeader = session ? { cookie: session.cookie } : {};
+  const cookieHeader: Record<string, string> = session ? { cookie: session.cookie } : {};
   switch (scenario) {
     case "catalog":
       return { path: `${base}/api/v1/courses` };
