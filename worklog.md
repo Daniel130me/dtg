@@ -878,3 +878,19 @@ Stage Summary:
 - Runtime restored in-sandbox: real Postgres on 127.0.0.1:5432 (out-of-repo), migrations + owner + seed applied, dev server serving real data on :3000; .env now DATABASE_URL/DIRECT_URL=postgresql://postgres@127.0.0.1:5432/dtg (sandbox shell still injects a sqlite DATABASE_URL - subshells running node scripts must export the postgres URL, the known trap now hit by dev server too, fixed by exporting before `bun run dev`)
 - Deviations/decisions: embedded-postgres lives OUTSIDE the repo (no dependency added); bun.lock committed to complete 39ab208's dependency audit; loadtest.ts type fix included; per-agent worklog entries for 12-a/b/c/d reconstructed in this entry rather than fabricated as if the agents had written them (honest provenance: committed work, missing logs)
 - Next: final browser E2E self-verification of the live surfaces, then the platform is at its release-gate state per plan section 10
+
+---
+Task ID: 12-f (coordinator)
+Agent: main-coordinator
+Task: Final browser E2E self-verification of the release-gate state (local Postgres runtime)
+
+Work Log:
+- Public: homepage renders clean (blue theme per the deliberate 2b-blue-theme-public.md user change, not a defect); courses catalog lists seeded data
+- Owner (default session): login kosokodaniel@gmail.com -> /owner dashboard with real analytics (14 students / 28 enrolments / $814.81 / 4.50 rating, trend chart + tooltips, freshness stamp + cached badge); /api/v1/metrics 401 anon, 200 owner (release 0.2.1, counters, histogram, alerts evaluated); /api/v1/health/diagnostics 401 anon, 200 owner (DB 1ms, smtp/r2/payments honestly unconfigured, queues null); Student Management lists seeded + new students; mobile 390px owner dashboard clean (stat cards stacked, live 15/29 after new registration)
+- Student (second browser session, full golden path): register student-e2e@example.test -> unverified sign-in correctly BLOCKED (verification gate works; dev DB flip of emailVerified to bypass SMTP-less local env) -> login -> /dashboard real empty state (0s + em dash for null time) -> catalog -> free course "Introduction to UI/UX Design" -> Enroll -> "You're enrolled in this course" -> dashboard shows Enrolled 1 -> lesson player renders (honest "No video published" empty state) -> Notes: typed + saved ("Saved" indicator), PERSISTS across reload -> Q&A: posted question (thread "1 post"), opened thread, posted reply ("2 posts") -> Mark as complete -> button flips to Completed, progress 100%, "1 of 1 lessons completed" -> dashboard aggregates: Lessons Completed 1, Time Completed 12m, Completed 1, course removed from Continue Learning
+- Cross-cutting: zero console errors / page errors across all flows; footer pushes naturally on tall pages and sits flush at viewport bottom on scrolled short pages (no gap, no overlap); Phase 8 features (progress/notes/discussions) verified live end-to-end
+- Operational notes: the sandbox kills tool-call-spawned process groups between calls inconsistently - dev server must be started with `(export DATABASE_URL=... ; bun run dev > dev.log 2>&1 &)` pattern; the mid-verification ERR_CONNECTION_REFUSED was this teardown, not an app defect (log shows clean 200s until death)
+
+Stage Summary:
+- E2E VERDICT: the platform is release-gate ready per plan section 10 - every visible UI action exercised is wired to the real API, authorization gates hold (401s verified), data flows end to end (register -> enrol -> learn -> complete), and observability surfaces (health/diagnostics/metrics) answer correctly
+- Phase 12 closed at commit d13f513 + this E2E addendum; all 13 phases of docs/BACKEND_IMPLEMENTATION_PLAN.md are now complete
