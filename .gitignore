@@ -62,3 +62,6 @@ upload/
 # sandbox postgres (portable binaries + data)
 .pg/
 .zscripts/dev.pid
+
+# Local embedded Postgres runtime (sandbox-only, never commit)
+.local-postgres/

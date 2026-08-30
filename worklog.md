@@ -894,3 +894,19 @@ Work Log:
 Stage Summary:
 - E2E VERDICT: the platform is release-gate ready per plan section 10 - every visible UI action exercised is wired to the real API, authorization gates hold (401s verified), data flows end to end (register -> enrol -> learn -> complete), and observability surfaces (health/diagnostics/metrics) answer correctly
 - Phase 12 closed at commit d13f513 + this E2E addendum; all 13 phases of docs/BACKEND_IMPLEMENTATION_PLAN.md are now complete
+
+---
+Task ID: 12-g (coordinator)
+Agent: main-coordinator
+Task: Restore the preview runtime after a full sandbox reset wiped the local Postgres, and add a one-command recovery script
+
+Work Log:
+- User reported the preview showing only the placeholder logo: diagnosis - the sandbox had recycled ALL processes and files outside /home/z/my-project (embedded-postgres binaries, pgdata cluster, seeded database all gone) and reverted .env to the injected sqlite URL; the gateway therefore had no upstream on :3000
+- Re-provisioned the runtime, this time INSIDE the project at .local-postgres/ (gitignored) so future resets only need a restart, not a re-download: initdb -> postgres on 127.0.0.1:5432 -> CREATE DATABASE dtg -> .env restored (DATABASE_URL/DIRECT_URL=postgresql://postgres@127.0.0.1:5432/dtg) -> prisma migrate deploy (8 migrations clean) -> owner re-bootstrapped (kosokodaniel@gmail.com / Phase9!OwnerPass1) -> seed re-run (5 categories, 6 published courses, 5 reviews, 10 analytics learners)
+- Wrote scripts/sandbox-db.sh: idempotent sandbox recovery (installs pinned binaries if missing, inits pgdata if missing, starts postgres if down, creates dtg if missing, repairs .env); fixed a real bug in it on first test - the create-database pg client was never closed on the "already exists" path, hanging the event loop forever (now closed in finally, plus a 15s timeout belt)
+- Verified the golden path again after the reset: homepage renders (browser screenshot), /api/v1/health/ready 200, catalog returns seeded courses, owner sign-in 200
+
+Stage Summary:
+- Preview runtime restored end to end; the "z logo only" symptom was the dead upstream, not an app defect
+- Sandbox survival rules learned twice now: (1) processes must be started detached ((cmd &) subshell pattern), (2) anything the next session needs must live inside /home/z/my-project - hence .local-postgres/ + scripts/sandbox-db.sh + the gitignored runtime dir
+- Recovery recipe for a fresh sandbox: bash scripts/sandbox-db.sh && bun run db:migrate:deploy && bunx tsx prisma/seed.ts (+ owner bootstrap if the user table is empty), then (export DATABASE_URL=...; bun run dev > dev.log 2>&1 &)
