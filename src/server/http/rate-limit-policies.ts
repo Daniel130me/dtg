@@ -25,4 +25,11 @@ export const RATE_LIMIT_POLICIES = {
     limit: 20,
     windowMs: ONE_MINUTE_MS,
   },
+  // Anonymous writes are the highest-abuse surface: a strict per-identity
+  // window backs the public contact form (honeypot + heuristics behind it).
+  contact: {
+    namespace: "contact",
+    limit: 5,
+    windowMs: FIFTEEN_MINUTES_MS,
+  },
 } as const satisfies Record<string, RateLimitPolicy>;
