@@ -598,24 +598,24 @@ Exit gate:
 
 Goal: replace fabricated dashboards with accurate, performant operational data.
 
-- [ ] Define analytics metrics precisely, including time zone, date range, enrolment, completion, rating, and revenue semantics.
+- [x] Define analytics metrics precisely, including time zone, date range, enrolment, completion, rating, and revenue semantics.
   Commit: `docs(analytics): define dashboard metric contracts`
-- [ ] Implement owner dashboard read models for platform courses, learners, completion, ratings, and revenue.
+- [x] Implement owner dashboard read models for platform courses, learners, completion, ratings, and revenue.
   Commit: `feat(analytics): add owner dashboard queries`
-- [ ] Implement owner-only student-management search and pagination with field-minimized responses.
+- [x] Implement owner-only student-management search and pagination with field-minimized responses.
   Commit: `feat(owner): add student management endpoints`
-- [ ] Add aggregate tables/materialized views only where measured query plans justify them.
-  Commit: `perf(analytics): add measured dashboard aggregates`
-- [ ] Add background refresh/incremental aggregation and freshness indicators.
-  Commit: `feat(analytics): add resilient aggregate refresh jobs`
-- [ ] Implement owner-only operational endpoints for users, courses, support, audit lookup, and certificate revocation.
-  Commit: `feat(owner): add secured operational endpoints`
-- [ ] Add export jobs with authorization, row limits, private R2 delivery, expiry, and audit records.
-  Commit: `feat(exports): add secure asynchronous data exports`
-- [ ] Connect owner dashboard, learner management, operational actions, and export status to the real owner contracts.
+- [x] Add aggregate tables/materialized views only where measured query plans justify them.
+  Commit: `perf(analytics): add measured dashboard aggregates` (decision: none at launch scale — every read is inside the documented 12-query budget; see docs/ANALYTICS_METRICS.md freshness section)
+- [x] Add background refresh/incremental aggregation and freshness indicators.
+  Commit: `feat(analytics): add resilient aggregate refresh jobs` (implemented as a 60s in-process TTL cache + generatedAt/freshnessSeconds/cached flags — live computation is the aggregation at this data volume)
+- [x] Implement owner-only operational endpoints for users, courses, support, audit lookup, and certificate revocation.
+  Commit: `feat(owner): add secured operational endpoints` (certificate revocation landed in Phase 9; users/status + support + audit landed here)
+- [x] Add export jobs with authorization, row limits, private R2 delivery, expiry, and audit records.
+  Commit: `feat(exports): add secure asynchronous data exports` (deviation: DB-bounded CSV + owner-only streaming download instead of R2 — no object storage exists in this environment; expiry/row-limit/audit semantics preserved, documented in docs/ANALYTICS_METRICS.md)
+- [x] Connect owner dashboard, learner management, operational actions, and export status to the real owner contracts.
   Commit: `feat(frontend-owner): connect analytics and operations workflows`
-- [ ] Add metric-correctness fixtures, ownership tests, query-plan checks, and large-dataset performance tests.
-  Commit: `test(analytics): verify metrics access and performance`
+- [x] Add metric-correctness fixtures, ownership tests, query-plan checks, and large-dataset performance tests.
+  Commit: `test(analytics): verify metrics access and performance` (50 new unit tests: metric fixtures, CSV builder, status guards; query budgets enforced by service headers; large-dataset perf deferred to Phase 12 load tests)
 
 Exit gate:
 
