@@ -1137,6 +1137,153 @@ export const openApiDocument = {
         },
       },
     },
+    "/owner/analytics": {
+      get: {
+        operationId: "getOwnerAnalytics",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Owner dashboard read model (totals, 6-month trend, top courses, recent activity, freshness stamp)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/students": {
+      get: {
+        operationId: "listOwnerStudents",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "q", in: "query", schema: { type: "string", maxLength: 100 } },
+          { name: "status", in: "query", schema: { type: "string", enum: ["ACTIVE", "SUSPENDED"] } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated, field-minimized learner rows with per-page aggregates." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Query validation failed." },
+        },
+      },
+    },
+    "/owner/students/{userId}": {
+      get: {
+        operationId: "getOwnerStudent",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "userId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Learner detail with per-enrolment progress rows." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "User not found." },
+        },
+      },
+    },
+    "/owner/users/{userId}/status": {
+      post: {
+        operationId: "setOwnerUserStatus",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "userId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Status changed; suspension also revoked the target's sessions." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "User not found." },
+          "422": { description: "Target is the owner or the caller themselves." },
+        },
+      },
+    },
+    "/owner/support/contact": {
+      get: {
+        operationId: "listOwnerContactSubmissions",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "status", in: "query", schema: { type: "string", enum: ["NEW", "ARCHIVED"] } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated contact submissions (retention-purged rows included with nulls)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/support/contact/{submissionId}": {
+      patch: {
+        operationId: "setOwnerContactStatus",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "submissionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Submission status updated (NEW or ARCHIVED)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Submission not found." },
+        },
+      },
+    },
+    "/owner/audit": {
+      get: {
+        operationId: "listOwnerAudit",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "actorId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "action", in: "query", schema: { type: "string", maxLength: 100 } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated audit trail, newest first." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Query validation failed." },
+        },
+      },
+    },
+    "/owner/exports": {
+      post: {
+        operationId: "createOwnerExport",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Export job processed inline; COMPLETED jobs carry rowCount and expiry." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Body validation failed." },
+        },
+      },
+      get: {
+        operationId: "listOwnerExports",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Export job history (newest first, no file content); expired jobs are flipped first." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/exports/{exportJobId}/download": {
+      get: {
+        operationId: "downloadOwnerExport",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "exportJobId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "CSV file stream (text/csv attachment)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Export job not found." },
+          "410": { description: "The export file has expired and was purged." },
+          "409": { description: "The export never completed." },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

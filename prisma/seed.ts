@@ -515,6 +515,238 @@ async function seedReviews(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Owner analytics demo data (Phase 11).
+//
+// Ten deterministic learners spread across the last six months, with
+// enrolments, purchase orders + SUCCEEDED payments, lesson progress and a few
+// completed courses. This gives the owner dashboard (docs/ANALYTICS_METRICS.md)
+// a truthful-looking trend without touching any service logic. Every write is
+// an upsert on a natural key so repeated seeds converge; payment success times
+// are backfilled with raw SQL because @updatedAt cannot be set through the
+// client, and the trend buckets on Payment.updatedAt for SUCCEEDED rows.
+// ---------------------------------------------------------------------------
+
+const ANALYTICS_LEARNERS = [
+  "Chiamaka Eze",
+  "Emeka Obi",
+  "Fatima Abubakar",
+  "Kelechi Nwosu",
+  "Aisha Bello",
+  "Olumide Adeyemi",
+  "Ngozi Okafor",
+  "Yusuf Ibrahim",
+  "Blessing Adebayo",
+  "Tope Alabi",
+];
+
+/** First day, N months before the current UTC month, at a fixed time of day. */
+function analyticsDate(monthsAgo: number, day: number, hour: number): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo, day, hour, 24, 0));
+}
+
+/** Progress/derivative dates keep inside the past (never the future). */
+function analyticsDateCapped(date: Date): Date {
+  return date.getTime() > Date.now() ? new Date(Date.now() - 60_000) : date;
+}
+
+async function seedAnalyticsDemo(): Promise<void> {
+  const courses = await prisma.course.findMany({
+    where: { status: CourseStatus.PUBLISHED },
+    select: { id: true, slug: true, title: true, priceMinor: true, currency: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (courses.length === 0) throw new Error("Analytics seed: no published courses.");
+
+  const lessonRows = await prisma.lesson.findMany({
+    where: { courseId: { in: courses.map((course) => course.id) }, status: "PUBLISHED" },
+    select: { id: true, courseId: true, section: { select: { position: true } }, position: true },
+  });
+  const lessonsByCourse = new Map<string, Array<{ id: string }>>();
+  for (const lesson of lessonRows) {
+    const list = lessonsByCourse.get(lesson.courseId) ?? [];
+    list.push(lesson);
+    lessonsByCourse.set(lesson.courseId, list);
+  }
+  for (const list of lessonsByCourse.values()) list.sort((a, b) => a.id.localeCompare(b.id));
+
+  // (1) Learners: one per name, joined (i % 6) months ago.
+  const learnerIds: string[] = [];
+  for (const [index, name] of ANALYTICS_LEARNERS.entries()) {
+    const email = `analytics-learner-${index + 1}@example.test`;
+    const createdAt = analyticsDate(index % 6, 3 + (index % 20), 9 + (index % 10));
+    const learner = await prisma.user.upsert({
+      where: { emailNormalized: email },
+      update: { createdAt },
+      create: {
+        name,
+        email,
+        emailNormalized: email,
+        emailVerified: true,
+        createdAt,
+        profile: { create: { displayName: name, countryCode: "NG", timezone: "Africa/Lagos" } },
+      },
+      select: { id: true },
+    });
+    learnerIds.push(learner.id);
+  }
+
+  const paymentSuccessDates: Array<{ id: string; succeededAt: Date }> = [];
+
+  // (2) Enrolments: learner i takes courses (i*2) % C and ((i*2)+1) % C.
+  for (const [learnerIndex, userId] of learnerIds.entries()) {
+    const coursePairs = new Set<number>();
+    coursePairs.add((learnerIndex * 2) % courses.length);
+    coursePairs.add((learnerIndex * 2 + 1) % courses.length);
+    if (learnerIndex % 4 === 0) coursePairs.add((learnerIndex * 5 + 2) % courses.length);
+
+    for (const courseIndex of coursePairs) {
+      const course = courses[courseIndex];
+      const enrolledAt = analyticsDate(
+        (learnerIndex + courseIndex) % 6,
+        3 + ((learnerIndex + courseIndex) % 22),
+        8 + (courseIndex % 12),
+      );
+
+      // Purchase plumbing first so the enrolment can reference the order item.
+      // Order and payment are written separately (no wrapping transaction), so
+      // every combination of partial state from an earlier failed run must
+      // converge — hence query-then-create on both natural keys.
+      let orderItemId: string | null = null;
+      if (course.priceMinor > 0) {
+        const orderRef = `seed-analytics-order-${learnerIndex + 1}-${courseIndex + 1}`;
+        const paymentRef = `seed-analytics-payment-${learnerIndex + 1}-${courseIndex + 1}`;
+        const succeededAt = analyticsDateCapped(new Date(enrolledAt.getTime() + 2 * 60_000));
+
+        let order = await prisma.order.findUnique({
+          where: { provider_providerRef: { provider: "flutterwave", providerRef: orderRef } },
+          select: { id: true, items: { select: { id: true, courseId: true } } },
+        });
+        if (!order) {
+          order = await prisma.order.create({
+            data: {
+              userId,
+              status: "PAID",
+              currency: course.currency,
+              totalMinor: course.priceMinor,
+              provider: "flutterwave",
+              providerRef: orderRef,
+              createdAt: enrolledAt,
+              items: {
+                create: {
+                  courseId: course.id,
+                  unitPriceMinor: course.priceMinor,
+                  currency: course.currency,
+                },
+              },
+            },
+            select: { id: true, items: { select: { id: true, courseId: true } } },
+          });
+        }
+        orderItemId = order.items.find((item) => item.courseId === course.id)?.id ?? null;
+        if (!orderItemId) {
+          const item = await prisma.orderItem.create({
+            data: {
+              orderId: order.id,
+              courseId: course.id,
+              unitPriceMinor: course.priceMinor,
+              currency: course.currency,
+            },
+            select: { id: true },
+          });
+          orderItemId = item.id;
+        }
+
+        let payment = await prisma.payment.findUnique({
+          where: { provider_providerRef: { provider: "flutterwave", providerRef: paymentRef } },
+          select: { id: true },
+        });
+        if (!payment) {
+          payment = await prisma.payment.create({
+            data: {
+              orderId: order.id,
+              provider: "flutterwave",
+              providerRef: paymentRef,
+              status: "SUCCEEDED",
+              amountMinor: course.priceMinor,
+              currency: course.currency,
+              createdAt: enrolledAt,
+            },
+            select: { id: true },
+          });
+        }
+        paymentSuccessDates.push({ id: payment.id, succeededAt });
+      }
+
+      const enrolment = await prisma.enrolment.upsert({
+        where: { userId_courseId: { userId, courseId: course.id } },
+        update: { orderItemId },
+        create: {
+          userId,
+          courseId: course.id,
+          status: "ACTIVE",
+          source: course.priceMinor > 0 ? EnrolmentSource.PURCHASE : EnrolmentSource.FREE,
+          orderItemId,
+          createdAt: enrolledAt,
+        },
+        select: { id: true },
+      });
+
+      // Progress: deterministic slice of the published curriculum; finishing
+      // everything flips the enrolment to COMPLETED.
+      const lessons = lessonsByCourse.get(course.id) ?? [];
+      const completeCount =
+        lessons.length === 0 ? 0 : ((learnerIndex * 7 + courseIndex * 3) % (lessons.length + 1));
+      let lastCompletedAt: Date | null = null;
+      for (const [lessonOffset, lesson] of lessons.slice(0, completeCount).entries()) {
+        const completedAt = analyticsDateCapped(
+          new Date(enrolledAt.getTime() + (lessonOffset + 1) * 3 * 24 * 60 * 60_000),
+        );
+        await prisma.lessonProgress.upsert({
+          where: { userId_lessonId: { userId, lessonId: lesson.id } },
+          update: { completedAt },
+          create: { userId, lessonId: lesson.id, courseId: course.id, completedAt },
+          select: { id: true },
+        });
+        lastCompletedAt = completedAt;
+      }
+
+      const finished = lessons.length > 0 && completeCount === lessons.length;
+      await prisma.enrolment.update({
+        where: { id: enrolment.id },
+        data: {
+          status: finished ? "COMPLETED" : "ACTIVE",
+          completedAt: finished ? lastCompletedAt : null,
+        },
+        select: { id: true },
+      });
+    }
+  }
+
+  // (3) Payment success times: @updatedAt cannot be provided through the
+  // client, and the revenue trend buckets on it, so backfill with raw SQL.
+  for (const { id, succeededAt } of paymentSuccessDates) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Payment" SET "updatedAt" = $1 WHERE "id" = $2::uuid`,
+      succeededAt,
+      id,
+    );
+  }
+
+  // (4) Recompute the denormalized enrolment counters from the seeded truth.
+  for (const course of courses) {
+    const count = await prisma.enrolment.count({
+      where: { courseId: course.id, status: { not: "REVOKED" } },
+    });
+    await prisma.course.update({
+      where: { id: course.id },
+      data: { enrollmentCount: count },
+      select: { id: true },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Development seed data cannot be loaded in production.");
@@ -538,9 +770,10 @@ async function main(): Promise<void> {
     await seedCourse(course, creatorUserId);
   }
   await seedReviews();
+  await seedAnalyticsDemo();
   const published = await prisma.course.count({ where: { status: "PUBLISHED" } });
   console.info(
-    `Seeded ${mockCategories.length} categories, ${mockCourses.length} courses (${published} published), ${REVIEW_SEEDS.length} reviews.`,
+    `Seeded ${mockCategories.length} categories, ${mockCourses.length} courses (${published} published), ${REVIEW_SEEDS.length} reviews, ${ANALYTICS_LEARNERS.length} analytics learners.`,
   );
 }
 

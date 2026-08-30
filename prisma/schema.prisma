@@ -132,6 +132,7 @@ model User {
   reviews               Review[]
   notifications         Notification[]
   reviewRepliesGiven    Review[]             @relation("ReviewReplier")
+  exportJobsRequested   ExportJob[]          @relation("ExportRequester")
 
   @@index([status, createdAt, id])
 }
@@ -443,6 +444,9 @@ model Enrolment {
   @@unique([userId, courseId])
   @@index([courseId, status])
   @@index([userId, status, createdAt])
+  // Serves the owner analytics monthly enrolment trend (status != REVOKED
+  // bucketed by createdAt month); see docs/ANALYTICS_METRICS.md.
+  @@index([status, createdAt])
 }
 
 model Order {
@@ -962,4 +966,50 @@ model ContactSubmission {
 
   @@index([status, createdAt])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Owner administration (Phase 11): async data exports.
+//
+// The generated CSV is stored bounded inside the row (EXPORT_MAX_ROWS caps
+// the size) and delivered through the owner-only download endpoint. Deviation
+// from the plan's "private R2 delivery": this environment has no object
+// storage (Phase 5 R2 was not built); the DB blob + streaming endpoint
+// preserves the private/expiring/audited semantics. EXPIRED jobs keep their
+// metadata but never their content.
+// ---------------------------------------------------------------------------
+
+enum ExportType {
+  ENROLMENTS
+  STUDENTS
+}
+
+enum ExportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model ExportJob {
+  id                String          @id @default(uuid()) @db.Uuid
+  requestedByUserId String          @db.Uuid
+  type              ExportType
+  status            ExportJobStatus @default(PENDING)
+  filters           Json?
+  rowCount          Int             @default(0)
+  content           String?         @db.Text
+  error             String?         @db.VarChar(500)
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  downloadCount     Int             @default(0)
+  downloadedAt      DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  requestedBy User @relation("ExportRequester", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([requestedByUserId, createdAt])
+  @@index([status, expiresAt])
 }
