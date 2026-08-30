@@ -964,6 +964,179 @@ export const openApiDocument = {
         },
       },
     },
+    "/courses/{slug}/reviews": {
+      get: {
+        operationId: "listCourseReviews",
+        parameters: [
+          { name: "slug", in: "path", required: true, schema: { type: "string" } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Public, VISIBLE-only review page for a published course (newest first)." },
+          "404": { description: "Course not found or not published." },
+        },
+      },
+    },
+    "/courses/{slug}/reviews/mine": {
+      get: {
+        operationId: "getMyReview",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "slug", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "The caller's own review for the course, or null." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Course not found." },
+        },
+      },
+      put: {
+        operationId: "upsertMyReview",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "slug", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "Review created or updated (verified-enrolment gate). Rating aggregates recomputed." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Course not found or not published." },
+          "422": { description: "Body validation failed or no verified enrolment." },
+        },
+      },
+      delete: {
+        operationId: "deleteMyReview",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "slug", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "The caller's review was withdrawn; aggregates recomputed." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "No review to withdraw." },
+          "422": { description: "Course mismatch." },
+        },
+      },
+    },
+    "/owner/reviews": {
+      get: {
+        operationId: "listOwnerReviews",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } },
+          { name: "status", in: "query", schema: { type: "string", enum: ["VISIBLE", "HIDDEN"] } },
+          { name: "courseId", in: "query", schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Owner moderation page across all courses (newest first)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/owner/reviews/{reviewId}/status": {
+      put: {
+        operationId: "moderateReview",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "reviewId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Moderation status applied; rating aggregates recomputed." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Review not found." },
+          "422": { description: "Body validation failed." },
+        },
+      },
+    },
+    "/owner/reviews/{reviewId}/reply": {
+      put: {
+        operationId: "replyToReview",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "reviewId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Owner reply upserted (visible reply on the review)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Review not found." },
+          "422": { description: "Body validation failed." },
+        },
+      },
+    },
+    "/learning/notifications": {
+      get: {
+        operationId: "listNotifications",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+          { name: "unreadOnly", in: "query", schema: { type: "string", enum: ["true", "false"] } },
+        ],
+        responses: {
+          "200": { description: "The caller's notification page (newest first) with the unread badge count." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/notifications/unread-count": {
+      get: {
+        operationId: "getUnreadNotificationCount",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Unread notification count for the caller." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/learning/notifications/{notificationId}/read": {
+      post: {
+        operationId: "markNotificationRead",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "notificationId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Notification marked read (idempotent)." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "Notification not found for the caller." },
+        },
+      },
+    },
+    "/learning/notifications/read-all": {
+      post: {
+        operationId: "markAllNotificationsRead",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Every unread notification for the caller marked read; count of rows touched." },
+          "401": { description: "Authentication is required." },
+        },
+      },
+    },
+    "/support/contact": {
+      post: {
+        operationId: "submitContact",
+        responses: {
+          "201": { description: "Contact submission accepted; a support notification is sent asynchronously." },
+          "422": { description: "Validation failed or spam controls rejected the submission." },
+          "429": { description: "Rate limit exceeded." },
+        },
+      },
+    },
+    "/owner/outbox/dispatch": {
+      post: {
+        operationId: "dispatchOutbox",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "One dispatcher sweep executed; counts of processed events returned." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

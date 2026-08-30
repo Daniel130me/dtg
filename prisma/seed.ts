@@ -1,4 +1,4 @@
-import { PrismaClient, CourseLevel, LessonType, CourseStatus } from "@prisma/client";
+import { PrismaClient, CourseLevel, CourseStatus, EnrolmentSource, LessonType } from "@prisma/client";
 import {
   categories as mockCategories,
   courses as mockCourses,
@@ -349,6 +349,172 @@ async function seedCourse(course: MockCourse, creatorUserId: string): Promise<vo
   }
 }
 
+// ---------------------------------------------------------------------------
+// Review seed data (Phase 10).
+//
+// Demo reviewers get ADMIN-source enrolments on the courses they review so
+// the verified-enrolment invariant holds for every seeded row. Reviews are
+// upserts keyed by (courseId, userId); the course rating aggregates are
+// recomputed from VISIBLE rows at the end of the run so the denormalized
+// Course.ratingAverage/ratingCount always match the seeded truth.
+// ---------------------------------------------------------------------------
+
+interface ReviewSeed {
+  courseSlug: string;
+  reviewerEmail: string;
+  reviewerName: string;
+  rating: number;
+  body: string;
+  /** Owner reply, if the platform owner has answered this review. */
+  reply?: string;
+  /** Moderation demo: hidden reviews are excluded from listing + aggregates. */
+  status?: "VISIBLE" | "HIDDEN";
+}
+
+const DEMO_REVIEWERS = [
+  { email: "reviewer-amara@example.test", name: "Amara Okafor" },
+  { email: "reviewer-tunde@example.test", name: "Tunde Bakare" },
+  { email: "reviewer-zainab@example.test", name: "Zainab Musa" },
+];
+
+const REVIEW_SEEDS: ReviewSeed[] = [
+  {
+    courseSlug: "complete-nextjs-react-masterclass",
+    reviewerEmail: "reviewer-amara@example.test",
+    reviewerName: "Amara Okafor",
+    rating: 5,
+    body:
+      "The server/client boundary explanations finally made RSC click for me. The dashboard assignment mirrors real work — I shipped the same pattern at my job the following week.",
+    reply:
+      "Thank you, Amara! Watch for the caching deep-dive section — it builds directly on the dashboard exercise.",
+  },
+  {
+    courseSlug: "complete-nextjs-react-masterclass",
+    reviewerEmail: "reviewer-tunde@example.test",
+    reviewerName: "Tunde Bakare",
+    rating: 4,
+    body:
+      "Excellent pacing and the quiz checkpoints kept me honest. Would love a follow-up on testing server components, but as a foundation this is the best I have taken.",
+  },
+  {
+    courseSlug: "complete-nextjs-react-masterclass",
+    reviewerEmail: "reviewer-zainab@example.test",
+    reviewerName: "Zainab Musa",
+    rating: 2,
+    body: "Download links were broken for two lessons when I took it.",
+    status: "HIDDEN",
+  },
+  {
+    courseSlug: "intro-ui-ux-design",
+    reviewerEmail: "reviewer-zainab@example.test",
+    reviewerName: "Zainab Musa",
+    rating: 5,
+    body:
+      "Went from blank canvas to a confident design system in two weekends. The component-variant exercises are worth the price alone.",
+    reply: "So glad the variants module landed well — that one took the longest to design!",
+  },
+  {
+    courseSlug: "intro-ui-ux-design",
+    reviewerEmail: "reviewer-amara@example.test",
+    reviewerName: "Amara Okafor",
+    rating: 4,
+    body: "Great practical exercises. The auto-layout section assumes a little prior Figma familiarity.",
+  },
+];
+
+async function seedReviews(): Promise<void> {
+  const ownerUserId = await resolveCreatorUserId();
+
+  for (const reviewer of DEMO_REVIEWERS) {
+    const emailNormalized = reviewer.email.toLowerCase();
+    await prisma.user.upsert({
+      where: { emailNormalized },
+      update: {},
+      create: {
+        name: reviewer.name,
+        email: reviewer.email,
+        emailNormalized,
+        profile: {
+          create: { displayName: reviewer.name, countryCode: "NG", timezone: "Africa/Lagos" },
+        },
+      },
+      select: { id: true },
+    });
+  }
+
+  for (const seed of REVIEW_SEEDS) {
+    const course = await prisma.course.findUnique({
+      where: { slug: seed.courseSlug },
+      select: { id: true },
+    });
+    if (!course) throw new Error(`Review seed: course "${seed.courseSlug}" missing.`);
+
+    const reviewer = await prisma.user.findUnique({
+      where: { emailNormalized: seed.reviewerEmail },
+      select: { id: true },
+    });
+    if (!reviewer) throw new Error(`Review seed: reviewer "${seed.reviewerEmail}" missing.`);
+
+    // The verified-enrolment invariant: every seeded review sits on an enrolment.
+    await prisma.enrolment.upsert({
+      where: { userId_courseId: { userId: reviewer.id, courseId: course.id } },
+      update: {},
+      create: {
+        userId: reviewer.id,
+        courseId: course.id,
+        source: EnrolmentSource.ADMIN,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+
+    await prisma.review.upsert({
+      where: { courseId_userId: { courseId: course.id, userId: reviewer.id } },
+      update: {
+        rating: seed.rating,
+        body: seed.body,
+        status: seed.status ?? "VISIBLE",
+        reply: seed.reply ?? null,
+        repliedAt: seed.reply ? new Date() : null,
+        repliedByUserId: seed.reply ? ownerUserId : null,
+      },
+      create: {
+        courseId: course.id,
+        userId: reviewer.id,
+        rating: seed.rating,
+        body: seed.body,
+        status: seed.status ?? "VISIBLE",
+        reply: seed.reply ?? null,
+        repliedAt: seed.reply ? new Date() : null,
+        repliedByUserId: seed.reply ? ownerUserId : null,
+      },
+      select: { id: true },
+    });
+  }
+
+  // Recompute the denormalized rating aggregates from the seeded truth so the
+  // public catalog never shows a rating the review rows do not support.
+  const coursesWithReviews = await prisma.course.findMany({
+    where: { reviews: { some: {} } },
+    select: { id: true },
+  });
+  for (const course of coursesWithReviews) {
+    const aggregate = await prisma.review.aggregate({
+      where: { courseId: course.id, status: "VISIBLE" },
+      _avg: { rating: true },
+      _count: { _all: true },
+    });
+    await prisma.course.update({
+      where: { id: course.id },
+      data: {
+        ratingAverage: aggregate._avg.rating === null ? null : Number(aggregate._avg.rating.toFixed(2)),
+        ratingCount: aggregate._count._all,
+      },
+      select: { id: true },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Development seed data cannot be loaded in production.");
@@ -371,8 +537,11 @@ async function main(): Promise<void> {
   for (const course of mockCourses) {
     await seedCourse(course, creatorUserId);
   }
+  await seedReviews();
   const published = await prisma.course.count({ where: { status: "PUBLISHED" } });
-  console.info(`Seeded ${mockCategories.length} categories, ${mockCourses.length} courses (${published} published).`);
+  console.info(
+    `Seeded ${mockCategories.length} categories, ${mockCourses.length} courses (${published} published), ${REVIEW_SEEDS.length} reviews.`,
+  );
 }
 
 main()

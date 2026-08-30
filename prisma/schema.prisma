@@ -129,6 +129,9 @@ model User {
   assignmentSubmissions AssignmentSubmission[]
   gradesGiven           AssignmentGrade[]    @relation("AssignmentGrader")
   certificates          Certificate[]
+  reviews               Review[]
+  notifications         Notification[]
+  reviewRepliesGiven    Review[]             @relation("ReviewReplier")
 
   @@index([status, createdAt, id])
 }
@@ -332,6 +335,7 @@ model Course {
   quizzes      Quiz[]
   assignments  Assignment[]
   certificates Certificate[]
+  reviews      Review[]
 
   @@index([status, publishedAt, id])
   @@index([categoryId, status])
@@ -848,4 +852,114 @@ model Certificate {
 
   @@unique([userId, courseId])
   @@index([courseId, status, issuedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement (Phase 10): verified course reviews, in-app notifications,
+// transactional-email suppression, and support contact submissions.
+//
+// Trust model:
+// - Reviews require a verified enrolment (ACTIVE or COMPLETED) at write time;
+//   moderation is a status flip, never a delete, so owner history survives.
+// - The Course.ratingAverage/ratingCount denormalized aggregates are owned by
+//   the reviews service and recomputed transactionally from VISIBLE rows on
+//   every create/update/moderate — moderation therefore always moves the
+//   public rating consistently.
+// - Notification rows are projected from committed OutboxEvents by the
+//   dispatcher; dedupeKey ("<eventKey>:<userId>", unique) makes reprocessing
+//   an event at-most-once per recipient.
+// - EmailSuppression is the permanent "do not email" list consulted before
+//   every transactional send; suppressed sends are completed no-ops, never
+//   failures that roll back the user transaction that triggered them.
+// - ContactSubmission bodies are purgeable PII: a retention sweep nulls the
+//   message fields after CONTACT_RETENTION_DAYS (contract constant).
+// ---------------------------------------------------------------------------
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+}
+
+/// One review per learner per course. A learner may create/update/withdraw
+/// their own review while enrolled; the owner moderates (HIDDEN) and replies.
+model Review {
+  id              String       @id @default(uuid()) @db.Uuid
+  courseId        String       @db.Uuid
+  userId          String       @db.Uuid
+  rating          Int
+  body            String       @db.VarChar(2000)
+  status          ReviewStatus @default(VISIBLE)
+  // Owner reply: a single updatable text attached to the review.
+  reply           String?      @db.VarChar(2000)
+  repliedAt       DateTime?
+  repliedByUserId String?      @db.Uuid
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replier User?  @relation("ReviewReplier", fields: [repliedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([courseId, userId])
+  @@index([courseId, status, createdAt, id])
+  @@index([userId, updatedAt])
+}
+
+/// In-app notification. `readAt` null means unread; the learner owns their
+/// rows and can only ever touch their own (userId-pinned queries).
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  topic     String    @db.VarChar(100)
+  title     String    @db.VarChar(200)
+  body      String?   @db.VarChar(500)
+  linkPath  String?   @db.VarChar(500)
+  // "<eventKey>:<userId>" for event-projected rows; unique -> idempotent replay.
+  dedupeKey String?   @unique @db.VarChar(320)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt, id])
+  @@index([userId, createdAt, id])
+}
+
+enum EmailSuppressionReason {
+  BOUNCE
+  COMPLAINT
+  MANUAL
+}
+
+/// Permanent do-not-email list, checked before every transactional send.
+model EmailSuppression {
+  id        String                 @id @default(uuid()) @db.Uuid
+  email     String                 @unique @db.VarChar(320)
+  reason    EmailSuppressionReason
+  detail    String?                @db.VarChar(500)
+  createdAt DateTime               @default(now())
+}
+
+enum ContactStatus {
+  NEW
+  ARCHIVED
+}
+
+/// Public support contact submission. Spam controls live at the endpoint
+/// (honeypot + rate limit); retention nulls the message fields after the
+/// contract's CONTACT_RETENTION_DAYS while keeping the row for abuse counts.
+model ContactSubmission {
+  id        String        @id @default(uuid()) @db.Uuid
+  name      String?       @db.VarChar(120)
+  email     String?       @db.VarChar(320)
+  subject   String?       @db.VarChar(200)
+  message   String?       @db.VarChar(5000)
+  status    ContactStatus @default(NEW)
+  ipAddress String?       @db.VarChar(64)
+  userAgent String?       @db.VarChar(512)
+  createdAt DateTime      @default(now())
+  purgedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([createdAt])
 }
