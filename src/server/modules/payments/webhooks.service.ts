@@ -17,6 +17,7 @@ import type { TransactionClient } from "@/server/db/transaction";
 import { withTransaction } from "@/server/db/transaction";
 import { getServerEnv } from "@/server/config/env";
 import { ApiError } from "@/server/http/errors";
+import { recordWebhookEvent, recordWebhookSignatureFailure } from "@/server/observability/metrics";
 import { fulfilPaidOrder } from "@/server/modules/payments/fulfilment.service";
 import {
   buildWebhookEventRef,
@@ -107,6 +108,8 @@ async function recordWebhookDelivery(
     update: { attempts: { increment: 1 }, lastError: null },
     select: { id: true },
   });
+  // Lag gauge source: the metrics scrape reads the oldest RECEIVED row.
+  recordWebhookEvent("received");
 }
 
 /** Terminal state (PROCESSED/FAILED/IGNORED) with a processedAt timestamp. */
@@ -135,6 +138,7 @@ async function completeWebhookEvent(
     update: { status, lastError, processedAt: new Date() },
     select: { id: true },
   });
+  recordWebhookEvent(status.toLowerCase() as "received" | "processed" | "failed" | "ignored");
 }
 
 export async function processFlutterwaveWebhook(
@@ -145,6 +149,8 @@ export async function processFlutterwaveWebhook(
   // FLUTTERWAVE_WEBHOOK_HASH makes every delivery invalid (fail-closed).
   const expectedHash = getServerEnv().FLUTTERWAVE_WEBHOOK_HASH ?? "";
   if (!isWebhookSignatureValid(verifHashHeader, expectedHash)) {
+    // Auth-abuse signal: counted and alert-evaluated (>=5 within 15 minutes).
+    recordWebhookSignatureFailure();
     throw new ApiError(
       401,
       PAYMENT_WEBHOOK_SIGNATURE_INVALID,

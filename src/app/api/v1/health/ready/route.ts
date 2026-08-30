@@ -4,6 +4,7 @@ import { getServerEnv } from "@/server/config/env";
 import { ApiError } from "@/server/http/errors";
 import { apiSuccess } from "@/server/http/responses";
 import { executeRoute } from "@/server/http/route-handler";
+import { spanFromContext } from "@/server/observability/trace";
 
 async function assertDatabaseReady(): Promise<void> {
   const { DB_READINESS_TIMEOUT_MS } = getServerEnv();
@@ -27,8 +28,10 @@ async function assertDatabaseReady(): Promise<void> {
 
 export async function GET(request: Request) {
   return executeRoute(request, async (context) => {
+    // The hand-rolled Promise.race timeout is kept as-is (identical 503
+    // semantics); the span only adds an observability line ("db.ping").
     try {
-      await assertDatabaseReady();
+      await spanFromContext("db.ping", context, () => assertDatabaseReady());
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError(503, "DATABASE_UNAVAILABLE", "A required dependency is unavailable.");

@@ -1,5 +1,6 @@
 import { db } from "@/server/db/client";
 import { ApiError } from "@/server/http/errors";
+import { recordRateLimited } from "@/server/observability/metrics";
 
 export interface RateLimitPolicy {
   namespace: string;
@@ -35,6 +36,8 @@ export async function consumeRateLimit(
   });
 
   if (bucket.count > policy.limit) {
+    // Namespace values come from the fixed policy table (bounded cardinality).
+    recordRateLimited(policy.namespace);
     throw new ApiError(429, "RATE_LIMITED", "Too many requests. Please try again later.");
   }
 

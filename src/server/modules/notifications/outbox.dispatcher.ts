@@ -16,7 +16,9 @@ import {
   renderExcerpt,
 } from "@/server/email/email.logic";
 import { EmailDeliveryError, sendWithSuppressionCheck } from "@/server/email/email-port";
+import { recordJobFailure, recordOutboxEvent } from "@/server/observability/metrics";
 import { logger } from "@/server/observability/logger";
+import { withSpan } from "@/server/observability/trace";
 import { purgeExpiredContactBodies } from "@/server/modules/support/contact.service";
 
 // ---------------------------------------------------------------------------
@@ -651,7 +653,7 @@ async function handleOutboxEvent(event: OutboxEventRow): Promise<ApplyOutcome> {
  * backoff-scheduled or FAILED per the retry policy and aggregated into the
  * result. Only a database outage propagates to the caller.
  */
-export async function dispatchPendingOutbox(options: { limit?: number } = {}): Promise<DispatchResult> {
+async function runOutboxDispatchSweep(options: { limit?: number } = {}): Promise<DispatchResult> {
   const limit = options.limit ?? DEFAULT_DISPATCH_LIMIT;
   const result: DispatchResult = {
     processed: 0,
@@ -694,6 +696,7 @@ export async function dispatchPendingOutbox(options: { limit?: number } = {}): P
     });
     if (claimed.count === 0) continue;
     result.processed += 1;
+    recordOutboxEvent("claimed");
 
     try {
       const outcome = await handleOutboxEvent(event);
@@ -707,6 +710,7 @@ export async function dispatchPendingOutbox(options: { limit?: number } = {}): P
         },
       });
       result.completed += 1;
+      recordOutboxEvent("completed");
       result.notificationsCreated += outcome.notificationsCreated;
       result.emailsSent += outcome.emailsSent;
       result.suppressedEmails += outcome.suppressedEmails;
@@ -725,6 +729,7 @@ export async function dispatchPendingOutbox(options: { limit?: number } = {}): P
           },
         });
         result.failed += 1;
+        recordOutboxEvent("failed");
         logger.error("Outbox event failed permanently", {
           eventId: event.id,
           topic: event.topic,
@@ -756,6 +761,22 @@ export async function dispatchPendingOutbox(options: { limit?: number } = {}): P
 }
 
 /**
+ * Public sweep entry: wraps the run in a single "outbox.dispatch" span that
+ * carries the claimed/completed/failed counts (one line per batch, not per
+ * event).
+ */
+export async function dispatchPendingOutbox(options: { limit?: number } = {}): Promise<DispatchResult> {
+  const spanAttrs: Record<string, unknown> = {};
+  return withSpan("outbox.dispatch", spanAttrs, async () => {
+    const result = await runOutboxDispatchSweep(options);
+    spanAttrs.claimed = result.processed;
+    spanAttrs.completed = result.completed;
+    spanAttrs.failed = result.failed;
+    return result;
+  });
+}
+
+/**
  * Fire-and-forget wrapper for request paths: callers spread `void
  * triggerBackgroundDispatch()` and never await it; failures are logged, never
  * surfaced to the request.
@@ -764,6 +785,7 @@ export async function triggerBackgroundDispatch(): Promise<void> {
   try {
     await dispatchPendingOutbox();
   } catch (error) {
+    recordJobFailure("outbox.dispatch");
     logger.error("Background outbox dispatch failed", { error });
   }
 }

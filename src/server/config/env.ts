@@ -17,6 +17,14 @@ const serverEnvSchema = z
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     DB_READINESS_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    // Observability knobs (Phase 12). RELEASE_ID falls back to the package
+    // version inside observability/release.ts when unset; METRICS_ENABLED
+    // gates the owner-facing /metrics endpoint (collection itself stays on).
+    RELEASE_ID: optionalString,
+    METRICS_ENABLED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
     DATABASE_URL: z
       .url()
       .refine((value) => value.startsWith("postgresql://") || value.startsWith("postgres://"), {
