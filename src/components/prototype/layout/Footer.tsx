@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { GraduationCap, Mail, MapPin, Phone, Twitter, Linkedin, Youtube, Globe } from 'lucide-react';
 import { useNav } from '@/lib/prototype/navigation';
-import { categories } from '@/lib/prototype/mock-data';
+import { FOOTER_CATEGORY_LINKS } from '@/content/site';
 import { Separator } from '@/components/ui/separator';
 
 const quickLinks = [
@@ -13,7 +14,8 @@ const quickLinks = [
   { label: 'Contact Us', view: 'contact' },
 ];
 
-const categoryLinks = categories.map(c => ({ label: c.name, id: c.id }));
+/** Real catalog slugs (src/content/site.ts) so each link lands pre-filtered. */
+const categoryLinks = FOOTER_CATEGORY_LINKS;
 
 export default function Footer() {
   const { navigate } = useNav();
@@ -71,13 +73,13 @@ export default function Footer() {
             <h3 className='font-semibold text-sm mb-4 text-foreground'>Categories</h3>
             <ul className='space-y-2.5'>
               {categoryLinks.map((cat) => (
-                <li key={cat.id}>
-                  <button
-                    onClick={() => navigate('courses')}
+                <li key={cat.slug}>
+                  <Link
+                    href={`/courses?category=${cat.slug}`}
                     className='text-sm text-muted-foreground hover:text-primary transition-colors'
                   >
                     {cat.label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>

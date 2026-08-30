@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import StarRating from '@/components/prototype/shared/StarRating';
 import { useNav } from '@/lib/prototype/navigation';
-import { instructor, testimonials } from '@/lib/prototype/mock-data';
+import { INSTRUCTOR_PROFILE, TESTIMONIALS } from '@/content/site';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -17,9 +17,9 @@ const fadeInUp = {
 };
 
 const stats = [
-  { icon: <Users className='size-5' />, value: instructor.totalStudents.toLocaleString() + '+', label: 'Students Taught', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
-  { icon: <BookOpen className='size-5' />, value: instructor.totalCourses.toString(), label: 'Courses Created', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
-  { icon: <Star className='size-5' />, value: instructor.rating.toString(), label: 'Average Rating', color: 'bg-amber-500/10 text-amber-600' },
+  { icon: <Users className='size-5' />, value: INSTRUCTOR_PROFILE.totalStudents.toLocaleString() + '+', label: 'Students Taught', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
+  { icon: <BookOpen className='size-5' />, value: INSTRUCTOR_PROFILE.totalCourses.toString(), label: 'Courses Created', color: 'bg-[#1d4ed8]/10 text-[#1d4ed8]' },
+  { icon: <Star className='size-5' />, value: INSTRUCTOR_PROFILE.rating.toString(), label: 'Average Rating', color: 'bg-amber-500/10 text-amber-600' },
   { icon: <Calendar className='size-5' />, value: '12+', label: 'Years Experience', color: 'bg-rose-500/10 text-rose-600' },
 ];
 
@@ -50,27 +50,27 @@ export default function AboutPage() {
             {/* Info */}
             <div className='text-center lg:text-left'>
               <Badge className='bg-[#3b82f6]/20 text-[#93c5fd] border-[#3b82f6]/30 mb-4'>Lead Instructor</Badge>
-              <h1 className='text-3xl sm:text-4xl font-bold text-white mb-2'>{instructor.name}</h1>
-              <p className='text-[#93c5fd] font-medium mb-4'>{instructor.title}</p>
-              <StarRating rating={instructor.rating} size='md' />
-              <p className='text-sm text-[#93c5fd]/60 mt-1 mb-6'>{instructor.rating} average rating from {instructor.totalStudents.toLocaleString()}+ students</p>
+              <h1 className='text-3xl sm:text-4xl font-bold text-white mb-2'>{INSTRUCTOR_PROFILE.name}</h1>
+              <p className='text-[#93c5fd] font-medium mb-4'>{INSTRUCTOR_PROFILE.title}</p>
+              <StarRating rating={INSTRUCTOR_PROFILE.rating} size='md' />
+              <p className='text-sm text-[#93c5fd]/60 mt-1 mb-6'>{INSTRUCTOR_PROFILE.rating} average rating from {INSTRUCTOR_PROFILE.totalStudents.toLocaleString()}+ students</p>
               <div className='flex flex-wrap gap-2 justify-center lg:justify-start'>
-                {instructor.socialLinks.twitter && (
+                {INSTRUCTOR_PROFILE.socialLinks.twitter && (
                   <Button variant='ghost' size='icon' className='size-9 bg-white/10 hover:bg-white/20 text-white border-white/10'>
                     <Twitter className='size-4' />
                   </Button>
                 )}
-                {instructor.socialLinks.linkedin && (
+                {INSTRUCTOR_PROFILE.socialLinks.linkedin && (
                   <Button variant='ghost' size='icon' className='size-9 bg-white/10 hover:bg-white/20 text-white border-white/10'>
                     <Linkedin className='size-4' />
                   </Button>
                 )}
-                {instructor.socialLinks.youtube && (
+                {INSTRUCTOR_PROFILE.socialLinks.youtube && (
                   <Button variant='ghost' size='icon' className='size-9 bg-white/10 hover:bg-white/20 text-white border-white/10'>
                     <Youtube className='size-4' />
                   </Button>
                 )}
-                {instructor.socialLinks.website && (
+                {INSTRUCTOR_PROFILE.socialLinks.website && (
                   <Button variant='ghost' size='icon' className='size-9 bg-white/10 hover:bg-white/20 text-white border-white/10'>
                     <Globe className='size-4' />
                   </Button>
@@ -109,9 +109,9 @@ export default function AboutPage() {
         <motion.div initial='hidden' whileInView='visible' viewport={{ once: true, margin: '-50px' }} variants={fadeInUp}>
           <h2 className='text-2xl font-bold mb-6'>About Daniel</h2>
           <div className='prose prose-sm max-w-none text-muted-foreground leading-relaxed space-y-4'>
-            <p>{instructor.bio.split('. ').slice(0, 2).join('. ')}.</p>
-            <p>{instructor.bio.split('. ').slice(2, 4).join('. ')}.</p>
-            <p>{instructor.bio.split('. ').slice(4).join('. ')}</p>
+            <p>{INSTRUCTOR_PROFILE.bio.split('. ').slice(0, 2).join('. ')}.</p>
+            <p>{INSTRUCTOR_PROFILE.bio.split('. ').slice(2, 4).join('. ')}.</p>
+            <p>{INSTRUCTOR_PROFILE.bio.split('. ').slice(4).join('. ')}</p>
           </div>
         </motion.div>
       </section>
@@ -179,7 +179,7 @@ export default function AboutPage() {
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } }}
           className='grid md:grid-cols-3 gap-6'
         >
-          {testimonials.map((t, i) => (
+          {TESTIMONIALS.map((t, i) => (
             <motion.div key={i} variants={fadeInUp}>
               <Card className='p-6 gap-4 h-full'>
                 <Quote className='size-7 text-primary/20' />
