@@ -138,17 +138,21 @@ model User {
 }
 
 model Profile {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @db.Uuid
-  displayName String   @db.VarChar(120)
-  countryCode String?  @db.VarChar(2)
-  bio         String?  @db.VarChar(1000)
-  locale      String   @default("en") @db.VarChar(16)
-  timezone    String   @default("UTC") @db.VarChar(64)
-  avatarKey   String?  @db.VarChar(1024)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @db.Uuid
+  displayName       String   @db.VarChar(120)
+  countryCode       String?  @db.VarChar(2)
+  bio               String?  @db.VarChar(1000)
+  locale            String   @default("en") @db.VarChar(16)
+  timezone          String   @default("UTC") @db.VarChar(64)
+  avatarKey         String?  @db.VarChar(1024)
+  // Per-user notification toggles (emailNotifications/courseUpdates/newContent/
+  // promotionalEmails). Nullable on purpose: null reads as the contract defaults
+  // so pre-existing rows keep their behaviour without a backfill.
+  notificationPrefs Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PlatformSettings {

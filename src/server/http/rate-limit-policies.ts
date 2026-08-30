@@ -32,4 +32,13 @@ export const RATE_LIMIT_POLICIES = {
     limit: 5,
     windowMs: FIFTEEN_MINUTES_MS,
   },
+  // Self-service account lifecycle (password change, data export, deletion).
+  // Identified by userId rather than client identity, tight windows because
+  // each action either rotates credentials, ships personal data, or is
+  // irreversible.
+  accountSensitive: {
+    namespace: "account-sensitive",
+    limit: 5,
+    windowMs: FIFTEEN_MINUTES_MS,
+  },
 } as const satisfies Record<string, RateLimitPolicy>;

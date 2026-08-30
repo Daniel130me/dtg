@@ -1,6 +1,7 @@
 import { getClientIdentifier } from "@/server/http/client-identity";
 import { db } from "@/server/db/client";
 import { ApiError } from "@/server/http/errors";
+import { recordAuthRateLimited } from "@/server/observability/metrics";
 
 const SENSITIVE_AUTH_ACTIONS = new Set([
   "sign-in",
@@ -52,6 +53,10 @@ export async function enforceAuthRateLimit(request: Request): Promise<void> {
 
   const retryAfterSeconds = progressiveCooldownSeconds(bucket.count);
   if (retryAfterSeconds === 0) return;
+
+  // Auth-abuse signal: action values are the fixed SENSITIVE_AUTH_ACTIONS set
+  // (bounded cardinality); feeds the owner metrics + alert evaluation.
+  recordAuthRateLimited(action);
 
   if ([6, 8, 10].includes(bucket.count)) {
     await db.auditLog.create({
