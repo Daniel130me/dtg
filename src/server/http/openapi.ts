@@ -22,6 +22,29 @@ export const openApiDocument = {
         },
       },
     },
+    "/health/diagnostics": {
+      get: {
+        operationId: "getHealthDiagnostics",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Owner-only deep diagnostics: database latency, provider configuration, queue lag, process/release info." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
+    "/metrics": {
+      get: {
+        operationId: "getOwnerMetrics",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Owner-only in-process metrics snapshot (counters, request-duration histogram, queue-lag gauges) with rolling-window alert evaluation." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Metrics are disabled via METRICS_ENABLED." },
+        },
+      },
+    },
     "/auth/me": {
       get: {
         operationId: "getCurrentUser",
@@ -1281,6 +1304,65 @@ export const openApiDocument = {
           "404": { description: "Export job not found." },
           "410": { description: "The export file has expired and was purged." },
           "409": { description: "The export never completed." },
+        },
+      },
+    },
+    "/account/profile": {
+      get: {
+        operationId: "getAccountProfile",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "The caller's account profile, notification preferences, and quick-badge stats." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The account was not found." },
+        },
+      },
+      patch: {
+        operationId: "updateAccountProfile",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Allowlisted profile fields applied; the refreshed profile is returned." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The account was not found." },
+          "422": { description: "Body validation failed (unknown fields rejected)." },
+        },
+      },
+    },
+    "/account/password": {
+      post: {
+        operationId: "changeAccountPassword",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Password rotated; every session except the caller's was revoked." },
+          "400": { description: "Current password is incorrect." },
+          "401": { description: "Authentication is required." },
+          "422": { description: "Body validation failed or the new password equals the current one." },
+          "429": { description: "Rate limit exceeded." },
+        },
+      },
+    },
+    "/account/export": {
+      get: {
+        operationId: "exportAccountData",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Personal-data archive (application/json attachment)." },
+          "401": { description: "Authentication is required." },
+          "429": { description: "Rate limit exceeded." },
+        },
+      },
+    },
+    "/account/delete": {
+      post: {
+        operationId: "deleteAccount",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Account anonymized and sessions revoked; the session cookie is cleared." },
+          "401": { description: "Authentication is required." },
+          "404": { description: "The account was not found." },
+          "409": { description: "The account state changed; deletion was not completed." },
+          "422": { description: "Confirmation word mismatch, owner account, or non-ACTIVE account." },
+          "429": { description: "Rate limit exceeded." },
         },
       },
     },
