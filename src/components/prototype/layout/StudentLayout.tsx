@@ -10,10 +10,12 @@ import {
   UserCircle,
   ArrowLeft,
   GraduationCap,
+  LogOut,
 } from 'lucide-react';
 import { useNav } from '@/lib/prototype/navigation';
 import type { ViewName } from '@/lib/prototype/types';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface NavItem {
   label: string;
@@ -35,9 +37,20 @@ interface StudentLayoutProps {
 }
 
 export default function StudentLayout({ children, activeView }: StudentLayoutProps) {
-  const { navigate, currentView } = useNav();
+  const { navigate, currentView, user, userName, userEmail, logout } = useNav();
   const effectiveView = activeView || currentView;
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  const displayName = user?.name || userName || 'Student';
+  const initials = displayName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'S';
+  const email = user?.email || userEmail || '';
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -59,7 +72,7 @@ export default function StudentLayout({ children, activeView }: StudentLayoutPro
         </div>
 
         {/* Nav Items */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = effectiveView === item.view;
             return (
@@ -90,8 +103,26 @@ export default function StudentLayout({ children, activeView }: StudentLayoutPro
           </div>
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t">
+        {/* User Account & Footer */}
+        <div className="p-4 border-t space-y-3">
+          <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+            <Avatar className="size-8">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate leading-tight">{displayName}</p>
+              {email && <p className="text-xs text-muted-foreground truncate">{email}</p>}
+            </div>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Log out"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </div>
           <div className="bg-primary/5 rounded-lg p-3">
             <p className="text-xs font-medium text-primary">Need Help?</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -187,6 +218,30 @@ export default function StudentLayout({ children, activeView }: StudentLayoutPro
                 </button>
               </div>
             </nav>
+
+            <div className="p-4 border-t mt-auto">
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate leading-tight">{displayName}</p>
+                  {email && <p className="text-xs text-muted-foreground truncate">{email}</p>}
+                </div>
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileOpen(false);
+                  }}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Log out"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              </div>
+            </div>
           </motion.aside>
         </div>
       )}

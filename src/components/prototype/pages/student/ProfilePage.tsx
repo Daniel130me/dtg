@@ -23,6 +23,11 @@ import {
   Loader2,
   LogIn,
 } from 'lucide-react';
+<<<<<<< HEAD
+=======
+import { useNav } from '@/lib/prototype/navigation';
+import { useStudentData } from '@/lib/prototype/student-data';
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import StudentLayout from '@/components/prototype/layout/StudentLayout';
 import { authClient } from '@/lib/client/auth-client';
 import { ApiClientError } from '@/lib/client/api-client';
@@ -67,6 +72,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+<<<<<<< HEAD
 // --- Motion presets (carried over from the prototype profile page) ----------
 
 const container = {
@@ -76,6 +82,25 @@ const container = {
     transition: { staggerChildren: 0.06 },
   },
 };
+=======
+export default function ProfilePage() {
+  const { user, userName, userEmail } = useNav();
+  const { enrolments, certificates } = useStudentData();
+  const [isEditing, setIsEditing] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Profile form state
+  const [name, setName] = useState(user?.name || userName || '');
+  const [bio, setBio] = useState('');
+  const [country, setCountry] = useState('');
+
+  React.useEffect(() => {
+    if (user?.name && !isEditing) {
+      setName(user.name);
+    }
+  }, [user?.name, isEditing]);
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
 const item = {
   hidden: { opacity: 0, y: 12 },
@@ -87,6 +112,7 @@ const item = {
 /** The exact word the server requires for deletion (contract-shared value). */
 const DELETION_WORD = 'DELETE';
 
+<<<<<<< HEAD
 const LOCALE_LABELS: Record<LocaleValue, string> = {
   en: 'English',
   fr: 'French',
@@ -282,6 +308,26 @@ export default function ProfilePage() {
     setIsEditing(false);
     setProfileError(null);
   };
+=======
+  const effectiveName = name || user?.name || userName || 'Student';
+  const initials = effectiveName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'S';
+
+  const email = user?.email || userEmail || '';
+  const memberSince = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Recently';
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
   const handleSaveProfile = () => {
     if (!profile) return;
@@ -310,6 +356,7 @@ export default function ProfilePage() {
       .finally(() => setSavingProfile(false));
   };
 
+<<<<<<< HEAD
   // --- Notification preferences (optimistic toggles) --------------------------
 
   const [savingPrefKey, setSavingPrefKey] = useState<NotificationPrefKey | null>(null);
@@ -334,6 +381,13 @@ export default function ProfilePage() {
         toast.error(err instanceof Error ? err.message : 'Could not save the preference.');
       })
       .finally(() => setSavingPrefKey(null));
+=======
+  const handleCancelEdit = () => {
+    setName(user?.name || userName || '');
+    setBio('');
+    setCountry('');
+    setIsEditing(false);
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
   };
 
   // --- Language preference (optimistic select) --------------------------------
@@ -777,6 +831,7 @@ export default function ProfilePage() {
                     aria-label='Language preference'
                     className='grid sm:grid-cols-3 gap-3'
                   >
+<<<<<<< HEAD
                     {LOCALES.map((code) => {
                       const active = profile.profile.locale === code;
                       return (
@@ -797,6 +852,120 @@ export default function ProfilePage() {
                         </button>
                       );
                     })}
+=======
+                    <Pencil className="size-3.5" />
+                    Edit
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveProfile}
+                      className="gap-1.5"
+                    >
+                      <Check className="size-3.5" />
+                      Save
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Avatar & Quick Info */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="size-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-bold text-primary">{initials}</span>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">{effectiveName}</h3>
+                  <p className="text-sm text-muted-foreground">{email}</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Badge variant="secondary" className="gap-1">
+                      <BookOpen className="size-3" />
+                      {enrolments.length} Courses
+                    </Badge>
+                    <Badge variant="secondary" className="gap-1">
+                      <Shield className="size-3" />
+                      {certificates.length} Certificates
+                    </Badge>
+                    <Badge variant="secondary" className="gap-1">
+                      <Calendar className="size-3" />
+                      Joined {memberSince}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Form Fields */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Full Name
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="size-4 text-muted-foreground" />
+                      {effectiveName}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Email Address
+                  </Label>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="size-4 text-muted-foreground" />
+                    {email}
+                    <Badge variant="outline" className="text-xs ml-1">
+                      {user?.emailVerified ? 'Verified' : 'Active'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="text-sm font-medium">
+                    Country
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="country"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="max-w-sm"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="size-4 text-muted-foreground" />
+                      {country || 'Not set'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="joined" className="text-sm font-medium">
+                    Member Since
+                  </Label>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="size-4 text-muted-foreground" />
+                    {memberSince}
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
                   </div>
                   {savingLocale && (
                     <p className='text-xs text-muted-foreground mt-2'>Saving…</p>

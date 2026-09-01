@@ -13,12 +13,18 @@ export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState(false);
   const [complete, setComplete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setError(null);
     setPending(true);
-    await authClient.requestPasswordReset({ email, redirectTo: '/reset-password' });
+    const result = await authClient.requestPasswordReset({ email, redirectTo: '/reset-password' });
     setPending(false);
+    if (result.error) {
+      setError('We could not send the email right now. Please try again in a moment.');
+      return;
+    }
     setComplete(true);
   }
 
@@ -30,6 +36,7 @@ export function ForgotPasswordForm() {
           <Label htmlFor='recovery-email'>Email address</Label>
           <Input id='recovery-email' type='email' value={email} onChange={(event) => setEmail(event.target.value)} required />
         </div>
+        {error && <p role='alert' className='text-sm text-destructive'>{error}</p>}
         {complete && <p role='status' className='text-sm text-green-700'>If the account exists, reset instructions have been sent.</p>}
         <Button className='w-full' disabled={pending || complete}>{pending ? 'Sending…' : 'Send instructions'}</Button>
         <Link className='block text-center text-sm text-primary hover:underline' href='/login'>Back to login</Link>

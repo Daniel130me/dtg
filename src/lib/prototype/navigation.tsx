@@ -5,6 +5,16 @@ import { useParams, usePathname, useRouter } from 'next/navigation';
 import { authClient } from '@/lib/client/auth-client';
 import type { ViewName } from './types';
 
+export interface NavigationUser {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified?: boolean;
+  createdAt?: Date | string;
+  image?: string | null;
+  role?: string;
+}
+
 interface NavigationState {
   currentView: ViewName;
   previousView: ViewName | null;
@@ -12,6 +22,8 @@ interface NavigationState {
   isAuthenticated: boolean;
   userRole: 'student' | 'owner';
   userName: string | null;
+  userEmail: string | null;
+  user: NavigationUser | null;
 }
 
 interface NavigationContextType extends NavigationState {
@@ -86,6 +98,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const currentView = resolveView(pathname);
   const { data: session } = authClient.useSession();
   const [previousView, setPreviousView] = useState<ViewName | null>(null);
+  const user = (session?.user as unknown as NavigationUser | undefined) ?? null;
   const userRole = (session?.user as { role?: string } | undefined)?.role === 'OWNER' ? 'owner' : 'student';
 
   const viewParams = useMemo(
@@ -110,7 +123,19 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   return (
     <NavigationContext.Provider
-      value={{ currentView, previousView, viewParams, isAuthenticated: Boolean(session), userRole, userName: session?.user.name ?? null, navigate, goBack, logout }}
+      value={{
+        currentView,
+        previousView,
+        viewParams,
+        isAuthenticated: Boolean(session),
+        userRole,
+        userName: session?.user.name ?? null,
+        userEmail: session?.user.email ?? null,
+        user,
+        navigate,
+        goBack,
+        logout,
+      }}
     >
       {children}
     </NavigationContext.Provider>

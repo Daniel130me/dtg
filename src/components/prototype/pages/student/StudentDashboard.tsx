@@ -3,7 +3,25 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+<<<<<<< HEAD
 import { ArrowRight, BookOpen, Clock, LogIn, PlayCircle, Trophy } from 'lucide-react';
+=======
+import {
+  BookOpen,
+  CheckCircle2,
+  Award,
+  Clock,
+  Bell,
+  ArrowRight,
+  PlayCircle,
+  Megaphone,
+  ClipboardCheck,
+  AlertCircle,
+  Info,
+} from 'lucide-react';
+import { useNav } from '@/lib/prototype/navigation';
+import { useStudentData } from '@/lib/prototype/student-data';
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import StudentLayout from '@/components/prototype/layout/StudentLayout';
 import { authClient } from '@/lib/client/auth-client';
 import { ApiClientError } from '@/lib/client/api-client';
@@ -187,6 +205,7 @@ function ContinueLearningCard({ card, index }: ContinueLearningCardProps) {
 // --- Page --------------------------------------------------------------------
 
 export default function StudentDashboard() {
+<<<<<<< HEAD
   // Session is only used for the greeting; auth itself is guaranteed by the
   // /dashboard route guard (unauthenticated -> /login, owner -> /owner).
   const { data: session } = authClient.useSession();
@@ -195,6 +214,14 @@ export default function StudentDashboard() {
   const [dashboard, setDashboard] = useState<LearnerDashboardDto | null>(null);
   const [error, setError] = useState<DashboardError | null>(null);
   const [retrySeed, setRetrySeed] = useState(0);
+=======
+  const { navigate, user, userName } = useNav();
+  const { enrolments, certificates, notifications, hoursLearned } = useStudentData();
+
+  const activeEnrolments = enrolments.filter((e) => e.status === 'active');
+  const completedEnrolments = enrolments.filter((e) => e.status === 'completed');
+  const totalHoursLearned = hoursLearned;
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
   // Loading is DERIVED from the request key (see CoursesPage/MyLearningPage)
   // so effects never call setState synchronously; all state writes happen in
@@ -226,6 +253,7 @@ export default function StudentDashboard() {
     };
   }, [requestKey]);
 
+<<<<<<< HEAD
   // Stats row values (derived; absent while loading/error).
   const stats = dashboard
     ? [
@@ -258,6 +286,10 @@ export default function StudentDashboard() {
 
   const cards = dashboard?.continueLearning ?? [];
   const hasEnrolments = (dashboard?.stats.enrolledCourses ?? 0) > 0;
+=======
+  const displayName = user?.name || userName || 'Student';
+  const firstName = displayName.trim().split(/\s+/)[0] || 'Student';
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
   return (
     <StudentLayout>

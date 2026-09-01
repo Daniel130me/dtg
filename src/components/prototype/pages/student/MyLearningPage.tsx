@@ -3,7 +3,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+<<<<<<< HEAD
 import { ArrowRight, BookOpen, CheckCircle2, CircleDot, Clock, Loader2 } from 'lucide-react';
+=======
+import {
+  BookOpen,
+  CheckCircle2,
+  Award,
+  Clock,
+  PlayCircle,
+  ArrowRight,
+  CircleDot,
+} from 'lucide-react';
+import { useNav } from '@/lib/prototype/navigation';
+import { useStudentData } from '@/lib/prototype/student-data';
+import { courses } from '@/lib/prototype/mock-data';
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import StudentLayout from '@/components/prototype/layout/StudentLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -238,7 +253,12 @@ function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
 // --- Page -------------------------------------------------------------------
 
 export default function MyLearningPage() {
+<<<<<<< HEAD
   const [activeTab, setActiveTab] = useState<TabValue>(TAB_ALL);
+=======
+  const { navigate } = useNav();
+  const { enrolments, certificates } = useStudentData();
+>>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
   const [items, setItems] = useState<EnrolmentDto[]>([]);
   const [total, setTotal] = useState(0);
