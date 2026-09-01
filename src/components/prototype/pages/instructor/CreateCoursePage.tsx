@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Trash2,
   Upload,
+  Video,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -197,6 +198,39 @@ export default function CreateCoursePage() {
       ...sections,
       { clientId: crypto.randomUUID(), title: '', lessons: [] },
     ]);
+  };
+
+  const addLectureVideo = () => {
+    const lesson = createDraftLesson();
+
+    setCurriculum((sections) => {
+      if (sections.length === 0) {
+        return [
+          {
+            clientId: crypto.randomUUID(),
+            title: '',
+            lessons: [lesson],
+          },
+        ];
+      }
+
+      // Put the new lecture in the latest section. The owner can move it after
+      // saving, while this keeps the one-click authoring action predictable.
+      const targetSectionId = sections.at(-1)?.clientId;
+      return sections.map((section) =>
+        section.clientId === targetSectionId
+          ? { ...section, lessons: [...section.lessons, lesson] }
+          : section,
+      );
+    });
+
+    // React commits the new lesson before the next paint, so the file control
+    // can be brought into view without timing constants or a DOM polling loop.
+    requestAnimationFrame(() => {
+      const input = document.getElementById(`lesson-video-${lesson.clientId}`);
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input?.focus({ preventScroll: true });
+    });
   };
 
   const updateSectionTitle = (sectionId: string, value: string) => {
@@ -532,8 +566,27 @@ export default function CreateCoursePage() {
                   )}
                 </div>
                 <Separator />
+                <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-background">
+                      <Video className="size-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Recorded lecture videos</p>
+                      <p className="text-xs text-muted-foreground">
+                        Upload MP4 or WebM files from your computer. Each recording is attached to
+                        a video lesson in the curriculum.
+                      </p>
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" onClick={addLectureVideo}>
+                    <Upload className="mr-2 size-4" />
+                    Add lecture video
+                  </Button>
+                </div>
+                <Separator />
                 <div className="space-y-2">
-                  <Label htmlFor="promo-video">Promo Video Link</Label>
+                  <Label htmlFor="promo-video">Optional promotional video link</Label>
                   <div className="relative">
                     <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <Input
@@ -552,12 +605,21 @@ export default function CreateCoursePage() {
 
           {/* 3. Curriculum */}
           <motion.div variants={item}>
-            <Card>
+            <Card id="course-curriculum">
               <CardHeader>
-                <CardTitle className="text-base">3. Curriculum</CardTitle>
-                <CardDescription>
-                  Draft the initial sections and lessons. You can refine and reorder them later.
-                </CardDescription>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">3. Curriculum</CardTitle>
+                    <CardDescription>
+                      Draft the initial sections and lessons. Upload recordings inside video
+                      lessons; you can refine and reorder them later.
+                    </CardDescription>
+                  </div>
+                  <Button type="button" size="sm" onClick={addLectureVideo}>
+                    <Upload className="mr-2 size-4" />
+                    Add lecture video
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {curriculum.length === 0 ? (
@@ -569,6 +631,10 @@ export default function CreateCoursePage() {
                     <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                       Add at least one section and one lesson before publishing.
                     </p>
+                    <Button type="button" size="sm" className="mt-4" onClick={addLectureVideo}>
+                      <Upload className="mr-2 size-4" />
+                      Add your first video lesson
+                    </Button>
                   </div>
                 ) : (
                   curriculum.map((section, sectionIndex) => (

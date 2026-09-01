@@ -854,6 +854,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
     () => [...course.sections].sort((a, b) => a.position - b.position),
     [course.sections],
   );
+  const latestSection = sections.at(-1);
 
   // Every mutation bumps the course version server-side, so the tab simply
   // refetches the course afterwards to stay authoritative. Actions may return
@@ -974,15 +975,28 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                 {formatCourseContentLength(course.totalMinutes)} of content
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setSectionDialog({ mode: 'create' })}
-              disabled={busy}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
-            >
-              <Plus className="size-4 mr-2" />
-              Add section
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {latestSection && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLessonDialog({ mode: 'create', section: latestSection })}
+                  disabled={busy}
+                >
+                  <Upload className="mr-2 size-4" />
+                  Add lecture video
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => setSectionDialog({ mode: 'create' })}
+                disabled={busy}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <Plus className="size-4 mr-2" />
+                Add section
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -991,7 +1005,8 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
               <Layers className="size-8 mx-auto text-muted-foreground" />
               <p className="mt-3 text-sm font-medium">No sections yet</p>
               <p className="text-xs text-muted-foreground mt-1">
-                A course needs at least one section with one lesson before it can be published.
+                Add a section first. You can then upload a recording with the Add lecture video
+                action.
               </p>
               <Button
                 variant="outline"
@@ -1187,7 +1202,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   onClick={() => setLessonDialog({ mode: 'create', section })}
                 >
                   <Plus className="size-4 mr-2" />
-                  Add lesson
+                  Add lesson or upload video
                 </Button>
               </div>
             </div>
