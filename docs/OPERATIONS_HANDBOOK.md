@@ -20,7 +20,7 @@ drift. If a threshold changes in code, change the citation in the same commit.
 | Auth | Better Auth (email/password, Argon2 hashes, session cookies) | Sessions expire in 7 days, refreshed daily (see `docs/PRIVACY.md` §1) |
 | Payments | Flutterwave (secret key + webhook hash) | Optional at boot; both halves required together (see §3) |
 | Email | SMTP via Nodemailer | Optional at boot; dev falls back to structured log delivery |
-| Object storage | Cloudflare R2 (planned) | Not configured — media/assignment attachments are documented seams (`docs/RECOVERY_RUNBOOK.md` §3) |
+| Object storage | Cloudflare R2 | Direct thumbnail uploads and private multipart lecture-video uploads; assignment attachments remain a documented seam (`docs/RECOVERY_RUNBOOK.md` §3) |
 | Runtime shape | Single Next.js server process (`node .next/standalone/server.js`) | No sidecars; the outbox dispatcher runs on-demand via an owner-triggered endpoint (§6) |
 
 **Request path:** browser → Next.js route handler (`executeRoute` wrapper:
@@ -117,9 +117,10 @@ Validation is centralized in `src/server/config/env.ts` (Zod). The process
 | SMTP | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | All-or-nothing: partial config fails boot; absent config = logged mail delivery |
 | Flutterwave | `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_WEBHOOK_HASH` | All-or-nothing: partial config fails boot (prevents paid checkout without verifiable webhooks) |
 
-Browser-to-R2 thumbnail uploads also require a bucket CORS policy. Allow only
-the deployed application origins, the `PUT` method, and the `Content-Type`
-header; expose `ETag` and keep the preflight cache bounded. Example:
+Browser-to-R2 thumbnail and multipart lecture uploads also require a bucket
+CORS policy. Allow only the deployed application origins, the `PUT` method,
+and the `Content-Type` header; expose `ETag` (multipart completion requires
+each part ETag) and keep the preflight cache bounded. Example:
 
 ```json
 [
@@ -132,6 +133,16 @@ header; expose `ETag` and keep the preflight cache bounded. Example:
   }
 ]
 ```
+
+Lecture videos accept MP4/WebM files up to 20 GB. The browser uploads 16 MB
+parts directly to R2 with four concurrent requests and three attempts per
+part; the application server never buffers video bytes. Uploaded lectures
+remain private and the learning API issues a six-hour signed playback URL only
+after the enrolment or preview access check. Keep R2's seven-day incomplete
+multipart lifecycle so abandoned parts do not accumulate storage charges.
+The public Worker/custom domain must allow only thumbnail object prefixes; it
+must deny `courses/*/lessons/*`. Do not attach an unrestricted public domain to
+the bucket, because paid lecture playback depends on signed S3 GET URLs.
 
 Set `TRUST_PROXY_HEADERS=true` **only** behind a proxy that actually sets
 `X-Forwarded-For`/`X-Forwarded-Proto`, otherwise rate limiting and origin
@@ -296,7 +307,7 @@ documentation.
 
 | Area | State | Consequence / seam |
 | --- | --- | --- |
-| R2 object storage | Not configured | Media/attachment features degrade gracefully; schema and service seams exist (`docs/RECOVERY_RUNBOOK.md` §3) |
+| R2 assignment attachments | Not implemented | Course thumbnails and lecture videos are implemented; assignment attachments remain a documented seam (`docs/RECOVERY_RUNBOOK.md` §3) |
 | SMTP | Optional at boot | Unset = emails logged, not sent; suppression list still honored |
 | Flutterwave | Optional at boot | Unset = checkout disabled; set both key + hash or the process refuses to start |
 | External alert channel | Worker is an external seam | §4.3 defines the scrape contract; until wired, manual shift checks (§7) |

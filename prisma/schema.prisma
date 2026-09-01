@@ -102,37 +102,37 @@ enum OutboxStatus {
 }
 
 model User {
-  id              String            @id @default(uuid()) @db.Uuid
-  name            String            @db.VarChar(120)
-  email           String            @unique @db.VarChar(320)
-  emailNormalized String            @unique @db.VarChar(320)
-  emailVerified   Boolean           @default(false)
-  image           String?           @db.VarChar(2048)
-  role            UserRole          @default(STUDENT)
-  status          UserStatus        @default(ACTIVE)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  deletedAt       DateTime?
-  profile         Profile?
-  accounts        Account[]
-  sessions        Session[]
-  auditLogs       AuditLog[]        @relation("AuditActor")
-  ownedPlatform   PlatformSettings? @relation("PlatformOwner")
-  createdCourses    Course[]            @relation("CourseCreator")
-  enrolments        Enrolment[]
-  orders            Order[]
-  lessonProgress    LessonProgress[]
-  lessonNotes       LessonNote[]
-  discussionThreads DiscussionThread[]
-  discussionPosts   DiscussionPost[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  name                  String                 @db.VarChar(120)
+  email                 String                 @unique @db.VarChar(320)
+  emailNormalized       String                 @unique @db.VarChar(320)
+  emailVerified         Boolean                @default(false)
+  image                 String?                @db.VarChar(2048)
+  role                  UserRole               @default(STUDENT)
+  status                UserStatus             @default(ACTIVE)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  profile               Profile?
+  accounts              Account[]
+  sessions              Session[]
+  auditLogs             AuditLog[]             @relation("AuditActor")
+  ownedPlatform         PlatformSettings?      @relation("PlatformOwner")
+  createdCourses        Course[]               @relation("CourseCreator")
+  enrolments            Enrolment[]
+  orders                Order[]
+  lessonProgress        LessonProgress[]
+  lessonNotes           LessonNote[]
+  discussionThreads     DiscussionThread[]
+  discussionPosts       DiscussionPost[]
   quizAttempts          QuizAttempt[]
   assignmentSubmissions AssignmentSubmission[]
-  gradesGiven           AssignmentGrade[]    @relation("AssignmentGrader")
+  gradesGiven           AssignmentGrade[]      @relation("AssignmentGrader")
   certificates          Certificate[]
   reviews               Review[]
   notifications         Notification[]
-  reviewRepliesGiven    Review[]             @relation("ReviewReplier")
-  exportJobsRequested   ExportJob[]          @relation("ExportRequester")
+  reviewRepliesGiven    Review[]               @relation("ReviewReplier")
+  exportJobsRequested   ExportJob[]            @relation("ExportRequester")
 
   @@index([status, createdAt, id])
 }
@@ -331,20 +331,20 @@ model Course {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  category     Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  creator      User                @relation("CourseCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
-  sections     CourseSection[]
-  requirements CourseRequirement[]
-  outcomes     CourseOutcome[]
-  enrolments      Enrolment[]
-  orderItems      OrderItem[]
-  lessonProgress  LessonProgress[]
-  lessonNotes     LessonNote[]
-  discussions     DiscussionThread[]
-  quizzes      Quiz[]
-  assignments  Assignment[]
-  certificates Certificate[]
-  reviews      Review[]
+  category       Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  creator        User                @relation("CourseCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  sections       CourseSection[]
+  requirements   CourseRequirement[]
+  outcomes       CourseOutcome[]
+  enrolments     Enrolment[]
+  orderItems     OrderItem[]
+  lessonProgress LessonProgress[]
+  lessonNotes    LessonNote[]
+  discussions    DiscussionThread[]
+  quizzes        Quiz[]
+  assignments    Assignment[]
+  certificates   Certificate[]
+  reviews        Review[]
 
   @@index([status, publishedAt, id])
   @@index([categoryId, status])
@@ -368,28 +368,34 @@ model CourseSection {
 }
 
 model Lesson {
-  id              String       @id @default(uuid()) @db.Uuid
-  sectionId       String       @db.Uuid
+  id               String       @id @default(uuid()) @db.Uuid
+  sectionId        String       @db.Uuid
   // courseId is denormalized from the section to power unique position
   // constraints and access checks without joining through sections.
-  courseId        String       @db.Uuid
-  title           String       @db.VarChar(200)
-  type            LessonType
-  status          LessonStatus @default(DRAFT)
-  position        Int
-  durationSeconds Int          @default(0)
-  isPreview       Boolean      @default(false)
-  // Text-lesson body (Markdown). Video lessons reference media in a later phase.
-  content         String?      @db.VarChar(20000)
-  videoUrl        String?      @db.VarChar(2048)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  courseId         String       @db.Uuid
+  title            String       @db.VarChar(200)
+  type             LessonType
+  status           LessonStatus @default(DRAFT)
+  position         Int
+  durationSeconds  Int          @default(0)
+  isPreview        Boolean      @default(false)
+  // Text-lesson body (Markdown). `videoUrl` remains for backwards-compatible
+  // external media; uploaded lectures use the private R2 object metadata below.
+  content          String?      @db.VarChar(20000)
+  videoUrl         String?      @db.VarChar(2048)
+  videoKey         String?      @db.VarChar(512)
+  videoFileName    String?      @db.VarChar(255)
+  videoContentType String?      @db.VarChar(100)
+  videoSizeBytes   BigInt?
+  videoUploadedAt  DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   section CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
-  progress LessonProgress[]
-  notes    LessonNote[]
-  threads  DiscussionThread[]
+  progress   LessonProgress[]
+  notes      LessonNote[]
+  threads    DiscussionThread[]
   quiz       Quiz?
   assignment Assignment?
 
@@ -430,19 +436,19 @@ model CourseOutcome {
 // ---------------------------------------------------------------------------
 
 model Enrolment {
-  id           String          @id @default(uuid()) @db.Uuid
-  userId       String          @db.Uuid
-  courseId     String          @db.Uuid
-  status       EnrolmentStatus @default(ACTIVE)
+  id          String          @id @default(uuid()) @db.Uuid
+  userId      String          @db.Uuid
+  courseId    String          @db.Uuid
+  status      EnrolmentStatus @default(ACTIVE)
   // How the learner got in: free enrolment, a paid order, or an owner grant.
-  source       EnrolmentSource @default(FREE)
+  source      EnrolmentSource @default(FREE)
   // Set when source = PURCHASE; links the access to the paid order line.
   // Unique: one purchase line produces at most one enrolment.
-  orderItemId  String?         @unique @db.Uuid
-  completedAt  DateTime?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  revokedAt    DateTime?
+  orderItemId String?         @unique @db.Uuid
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  revokedAt   DateTime?
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course     @relation(fields: [courseId], references: [id], onDelete: Restrict)
@@ -472,23 +478,23 @@ model Order {
   items    OrderItem[]
   payments Payment[]
 
+  @@unique([provider, providerRef])
   @@index([userId, createdAt])
   @@index([status, createdAt])
-  @@unique([provider, providerRef])
 }
 
 model OrderItem {
-  id             String   @id @default(uuid()) @db.Uuid
-  orderId        String   @db.Uuid
-  courseId       String   @db.Uuid
+  id             String @id @default(uuid()) @db.Uuid
+  orderId        String @db.Uuid
+  courseId       String @db.Uuid
   // Server-owned price snapshot taken at checkout time; client prices are
   // never trusted.
   unitPriceMinor Int
-  currency       String   @db.VarChar(3)
+  currency       String @db.VarChar(3)
 
-  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  course     Course      @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  enrolment  Enrolment?
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  course    Course     @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  enrolment Enrolment?
 
   @@unique([orderId, courseId])
   @@index([courseId])
@@ -510,9 +516,9 @@ model Payment {
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
   refunds Refund[]
 
+  @@unique([provider, providerRef])
   @@index([orderId])
   @@index([status, createdAt])
-  @@unique([provider, providerRef])
 }
 
 model Refund {
@@ -529,8 +535,8 @@ model Refund {
 
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
 
-  @@index([paymentId])
   @@unique([provider, providerRef])
+  @@index([paymentId])
 }
 
 model WebhookEvent {
@@ -585,12 +591,12 @@ model LessonProgress {
 
 /// One private, editable note per learner per lesson.
 model LessonNote {
-  id       String   @id @default(uuid()) @db.Uuid
-  userId   String   @db.Uuid
-  lessonId String   @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  lessonId  String   @db.Uuid
   // Denormalized from the lesson for the all-notes export.
-  courseId String   @db.Uuid
-  body     String   @db.VarChar(5000)
+  courseId  String   @db.Uuid
+  body      String   @db.VarChar(5000)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -617,9 +623,9 @@ model DiscussionThread {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   posts  DiscussionPost[]
 
   @@index([lessonId, status, lastActivityAt])
@@ -693,8 +699,8 @@ model Quiz {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  lesson    Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  course    Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions QuizQuestion[]
   attempts  QuizAttempt[]
 
@@ -718,12 +724,12 @@ model QuizQuestion {
 }
 
 model QuizOption {
-  id        String  @id @default(uuid()) @db.Uuid
-  questionId String @db.Uuid
-  position  Int
-  text      String  @db.VarChar(500)
+  id         String  @id @default(uuid()) @db.Uuid
+  questionId String  @db.Uuid
+  position   Int
+  text       String  @db.VarChar(500)
   // Answer key. Server-side only: excluded from every pre-submission payload.
-  isCorrect Boolean @default(false)
+  isCorrect  Boolean @default(false)
 
   question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
@@ -735,13 +741,13 @@ model QuizOption {
 /// points, explanation, options with the answer key) server-side; learners
 /// answered exactly what the snapshot records.
 model QuizAttempt {
-  id            String            @id @default(uuid()) @db.Uuid
-  quizId        String            @db.Uuid
+  id               String            @id @default(uuid()) @db.Uuid
+  quizId           String            @db.Uuid
   // Denormalized for per-course eligibility queries.
-  courseId      String            @db.Uuid
-  userId        String            @db.Uuid
-  attemptNumber Int
-  status        QuizAttemptStatus @default(STARTED)
+  courseId         String            @db.Uuid
+  userId           String            @db.Uuid
+  attemptNumber    Int
+  status           QuizAttemptStatus @default(STARTED)
   // Immutable server-side snapshot of questions/options (incl. answer key).
   // Never serialized to the client as-is.
   questionSnapshot Json
@@ -752,8 +758,8 @@ model QuizAttempt {
   maxPoints        Int?
   scorePercent     Int?
   passed           Boolean?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -783,18 +789,18 @@ model QuizAnswer {
 
 /// One assignment brief per ASSIGNMENT lesson.
 model Assignment {
-  id           String    @id @default(uuid()) @db.Uuid
-  lessonId     String    @unique @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  lessonId          String    @unique @db.Uuid
   // Denormalized from the lesson for per-course eligibility aggregation.
-  courseId     String    @db.Uuid
-  instructions String    @db.VarChar(10000)
-  maxPoints    Int       @default(100)
+  courseId          String    @db.Uuid
+  instructions      String    @db.VarChar(10000)
+  maxPoints         Int       @default(100)
   // Hard deadline for new submissions; null means open-ended.
-  dueAt        DateTime?
+  dueAt             DateTime?
   // When false, exactly one submission is accepted per learner.
-  allowResubmission Boolean @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  allowResubmission Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   lesson      Lesson                 @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   course      Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -819,8 +825,8 @@ model AssignmentSubmission {
   submittedAt   DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
-  assignment Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment Assignment        @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   grades     AssignmentGrade[]
 
   @@unique([assignmentId, userId, attemptNumber])
@@ -850,14 +856,14 @@ model AssignmentGrade {
 /// `code` is the public high-entropy verification reference carrying no
 /// personal information.
 model Certificate {
-  id        String            @id @default(uuid()) @db.Uuid
-  code      String            @unique @db.VarChar(32)
-  userId    String            @db.Uuid
-  courseId  String            @db.Uuid
-  status    CertificateStatus @default(ACTIVE)
-  issuedAt  DateTime          @default(now())
-  revokedAt DateTime?
-  revokedReason String?       @db.VarChar(500)
+  id            String            @id @default(uuid()) @db.Uuid
+  code          String            @unique @db.VarChar(32)
+  userId        String            @db.Uuid
+  courseId      String            @db.Uuid
+  status        CertificateStatus @default(ACTIVE)
+  issuedAt      DateTime          @default(now())
+  revokedAt     DateTime?
+  revokedReason String?           @db.VarChar(500)
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)

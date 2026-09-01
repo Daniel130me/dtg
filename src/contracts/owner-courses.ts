@@ -39,6 +39,10 @@ export const ownerLessonDtoSchema = z.object({
   isPreview: z.boolean(),
   content: z.string().nullable(),
   videoUrl: z.string().nullable(),
+  videoFileName: z.string().nullable(),
+  videoContentType: z.string().nullable(),
+  videoSizeBytes: z.number().int().nonnegative().nullable(),
+  videoUploadedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

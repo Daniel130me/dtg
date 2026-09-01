@@ -1,9 +1,11 @@
 import { LessonStatus } from "@prisma/client";
 import type { LessonAccessDto } from "@/contracts/learning";
 import { LESSON_NOT_FOUND } from "@/contracts/learning";
+import { LESSON_VIDEO_PLAYBACK_URL_TTL_SECONDS } from "@/contracts/lesson-video";
 import { db } from "@/server/db/client";
 import { ApiError } from "@/server/http/errors";
 import { compareCurriculumOrder, describeLessonAccess } from "@/server/modules/learning/learning.logic";
+import { createSignedGetUrl } from "@/server/storage/r2";
 
 // Authorization model: lesson reads are public — the access level is computed
 // per caller (signed-out callers resolve to userId = null) and content bytes
@@ -32,6 +34,7 @@ export async function getLessonAccess(
       isPreview: true,
       content: true,
       videoUrl: true,
+      videoKey: true,
       // The Lesson model denormalizes courseId without a course relation, so
       // the course summary rides on the section's course relation.
       section: {
@@ -98,6 +101,13 @@ export async function getLessonAccess(
   // The paywall contract: NONE callers receive the lesson shell without
   // content bytes so the client can render the enrol CTA.
   const unlocked = access !== "NONE";
+  const playableVideoUrl =
+    unlocked && lesson.videoKey
+      ? await createSignedGetUrl({
+          objectKey: lesson.videoKey,
+          expiresInSeconds: LESSON_VIDEO_PLAYBACK_URL_TTL_SECONDS,
+        })
+      : lesson.videoUrl;
   return {
     access,
     // The completion marker is only meaningful for enrolled learners.
@@ -109,7 +119,7 @@ export async function getLessonAccess(
       durationSeconds: lesson.durationSeconds,
       isPreview: lesson.isPreview,
       content: unlocked ? lesson.content : null,
-      videoUrl: unlocked ? lesson.videoUrl : null,
+      videoUrl: unlocked ? playableVideoUrl : null,
     },
     sectionTitle: lesson.section.title,
     prevLesson: neighbour(-1),

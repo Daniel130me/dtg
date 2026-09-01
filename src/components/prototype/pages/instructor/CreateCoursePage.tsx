@@ -31,7 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import InstructorLayout from './InstructorLayout';
-import { createCourse, listCategories, uploadCourseThumbnail } from '@/features/owner/api';
+import {
+  createCourse,
+  listCategories,
+  uploadCourseThumbnail,
+  uploadLessonVideo,
+} from '@/features/owner/api';
 import {
   showActionErrorToast,
   showValidationIssuesToast,
@@ -47,6 +52,10 @@ import {
   COURSE_THUMBNAIL_CONTENT_TYPES,
   MAX_COURSE_THUMBNAIL_BYTES,
 } from '@/contracts/course-media';
+import {
+  LESSON_VIDEO_CONTENT_TYPES,
+  MAX_LESSON_VIDEO_BYTES,
+} from '@/contracts/lesson-video';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatLevel } from '@/lib/client/format';
 
@@ -79,7 +88,7 @@ interface DraftLesson {
   durationMinutes: string;
   isPreview: boolean;
   content: string;
-  videoUrl: string;
+  videoFile: File | null;
 }
 
 interface DraftSection {
@@ -96,7 +105,7 @@ function createDraftLesson(): DraftLesson {
     durationMinutes: '0',
     isPreview: false,
     content: '',
-    videoUrl: '',
+    videoFile: null,
   };
 }
 
@@ -119,6 +128,12 @@ export default function CreateCoursePage() {
   const [promoVideoUrl, setPromoVideoUrl] = useState('');
   const [curriculum, setCurriculum] = useState<DraftSection[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState<{
+    title: string;
+    percent: number;
+    current: number;
+    total: number;
+  } | null>(null);
 
   // Categories load: state updates only from the async callbacks, never
   // synchronously inside the effect body (react-hooks/set-state-in-effect).
@@ -140,6 +155,16 @@ export default function CreateCoursePage() {
       cancelled = true;
     };
   }, [reloadToken]);
+
+  useEffect(() => {
+    if (!videoUploadProgress) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [videoUploadProgress]);
 
   const retryCategories = () => {
     setCategoriesState('loading');
@@ -228,6 +253,29 @@ export default function CreateCoursePage() {
     );
   };
 
+  const handleLessonVideoChange = (
+    sectionId: string,
+    lessonId: string,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      updateLesson(sectionId, lessonId, { videoFile: null });
+      return;
+    }
+    if (!(LESSON_VIDEO_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      toast.error('Choose an MP4 or WebM lecture video.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_LESSON_VIDEO_BYTES) {
+      toast.error('The lecture video must be 20 GB or smaller.');
+      event.target.value = '';
+      return;
+    }
+    updateLesson(sectionId, lessonId, { videoFile: file });
+  };
+
   const handleSubmit = async () => {
     if (effectivePriceMinor === null) {
       toast.error('Please enter a valid price (a non-negative number).');
@@ -252,9 +300,6 @@ export default function CreateCoursePage() {
           isPreview: lesson.isPreview,
           ...(lesson.type === 'TEXT' && lesson.content.trim()
             ? { content: lesson.content.trim() }
-            : {}),
-          ...(lesson.type === 'VIDEO' && lesson.videoUrl.trim()
-            ? { videoUrl: lesson.videoUrl.trim() }
             : {}),
         })),
       })),
@@ -281,13 +326,53 @@ export default function CreateCoursePage() {
           );
         }
       }
+      const pendingVideos = curriculum.flatMap((section, sectionIndex) =>
+        section.lessons.flatMap((lesson, lessonIndex) =>
+          lesson.type === 'VIDEO' && lesson.videoFile
+            ? [{ sectionIndex, lessonIndex, draft: lesson, file: lesson.videoFile }]
+            : [],
+        ),
+      );
+      let uploadedVideoCount = 0;
+      for (const [index, pending] of pendingVideos.entries()) {
+        const createdLesson = course.sections[pending.sectionIndex]?.lessons[pending.lessonIndex];
+        if (!createdLesson) continue;
+        setVideoUploadProgress({
+          title: pending.draft.title,
+          percent: 0,
+          current: index + 1,
+          total: pendingVideos.length,
+        });
+        try {
+          await uploadLessonVideo(createdLesson.id, pending.file, (percent) => {
+            setVideoUploadProgress({
+              title: pending.draft.title,
+              percent,
+              current: index + 1,
+              total: pendingVideos.length,
+            });
+          });
+          uploadedVideoCount += 1;
+        } catch (error) {
+          showActionErrorToast(
+            error,
+            `The course was created, but "${pending.draft.title}" needs its video uploaded again.`,
+          );
+        }
+      }
+      setVideoUploadProgress(null);
       toast.success(`"${course.title}" has been created.`, {
         description: `${course.totalSections} section(s) and ${course.totalLessons} lesson(s) saved${
+          pendingVideos.length > 0
+            ? `; ${uploadedVideoCount}/${pendingVideos.length} lecture video(s) uploaded`
+            : ''
+        }${
           thumbnailFile ? (thumbnailUploaded ? '; thumbnail uploaded.' : '; thumbnail needs retry.') : '.'
         }`,
       });
       router.push(`/owner/courses/${course.id}?tab=curriculum`);
     } catch (error) {
+      setVideoUploadProgress(null);
       showActionErrorToast(error, 'The course could not be created.');
       setSubmitting(false);
       return;
@@ -565,16 +650,28 @@ export default function CreateCoursePage() {
                               </Button>
                             </div>
                             {lesson.type === 'VIDEO' && (
-                              <Input
-                                type="url"
-                                placeholder="Optional video URL"
-                                value={lesson.videoUrl}
-                                onChange={(event) =>
-                                  updateLesson(section.clientId, lesson.clientId, {
-                                    videoUrl: event.target.value,
-                                  })
-                                }
-                              />
+                              <div className="space-y-2">
+                                <Label htmlFor={`lesson-video-${lesson.clientId}`}>
+                                  Recorded lecture video
+                                </Label>
+                                <Input
+                                  id={`lesson-video-${lesson.clientId}`}
+                                  type="file"
+                                  accept={LESSON_VIDEO_CONTENT_TYPES.join(',')}
+                                  onChange={(event) =>
+                                    handleLessonVideoChange(
+                                      section.clientId,
+                                      lesson.clientId,
+                                      event,
+                                    )
+                                  }
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  {lesson.videoFile
+                                    ? `${lesson.videoFile.name} (${(lesson.videoFile.size / 1024 / 1024).toFixed(1)} MB)`
+                                    : 'MP4 or WebM, up to 20 GB. Upload starts after the course draft is created.'}
+                                </p>
+                              </div>
                             )}
                             {lesson.type === 'TEXT' && (
                               <Textarea
@@ -702,9 +799,24 @@ export default function CreateCoursePage() {
                     ) : (
                       <Plus className="size-4" />
                     )}
-                    Create Course
+                    {videoUploadProgress
+                      ? `Uploading ${videoUploadProgress.current}/${videoUploadProgress.total}: ${videoUploadProgress.percent}%`
+                      : 'Create Course'}
                   </Button>
                 </div>
+                {videoUploadProgress && (
+                  <div className="space-y-1.5" aria-live="polite">
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-[width]"
+                        style={{ width: `${videoUploadProgress.percent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Uploading “{videoUploadProgress.title}”. Keep this page open.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

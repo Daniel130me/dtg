@@ -5,6 +5,17 @@ import type {
   CourseThumbnailResult,
   ThumbnailUploadTicket,
 } from "@/contracts/course-media";
+import {
+  LESSON_VIDEO_MAX_RETRIES,
+  LESSON_VIDEO_PART_BATCH_SIZE,
+  LESSON_VIDEO_UPLOAD_CONCURRENCY,
+} from "@/contracts/lesson-video";
+import type {
+  LessonVideoCompletedPart,
+  LessonVideoPartUrlResult,
+  LessonVideoResult,
+  LessonVideoUploadTicket,
+} from "@/contracts/lesson-video";
 import { ApiClientError } from "@/lib/client/api-client";
 import type {
   CreateCourseBody,
@@ -162,6 +173,147 @@ export async function uploadCourseThumbnail(
     },
   );
   return thumbnail;
+}
+
+function uploadVideoPart(
+  uploadUrl: string,
+  blob: Blob,
+  onProgress: (loadedBytes: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", uploadUrl);
+    request.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable) onProgress(event.loaded);
+    });
+    request.addEventListener("load", () => {
+      if (request.status < 200 || request.status >= 300) {
+        reject(new Error(`Media storage rejected upload part (${request.status}).`));
+        return;
+      }
+      const etag = request.getResponseHeader("etag");
+      if (!etag) {
+        reject(new Error("Media storage did not expose the uploaded part ETag."));
+        return;
+      }
+      onProgress(blob.size);
+      resolve(etag);
+    });
+    request.addEventListener("error", () => reject(new Error("The video upload was interrupted.")));
+    request.addEventListener("abort", () => reject(new Error("The video upload was cancelled.")));
+    request.send(blob);
+  });
+}
+
+async function uploadVideoPartWithRetry(
+  part: LessonVideoPartUrlResult,
+  blob: Blob,
+  onProgress: (loadedBytes: number) => void,
+): Promise<LessonVideoCompletedPart> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= LESSON_VIDEO_MAX_RETRIES; attempt += 1) {
+    try {
+      const etag = await uploadVideoPart(part.uploadUrl, blob, onProgress);
+      return { partNumber: part.partNumber, etag };
+    } catch (error) {
+      lastError = error;
+      onProgress(0);
+      if (attempt < LESSON_VIDEO_MAX_RETRIES) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** (attempt - 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Uploads lecture bytes directly from the browser to R2. The app server only
+ * signs bounded multipart operations; it never buffers or proxies the video.
+ */
+export async function uploadLessonVideo(
+  lessonId: string,
+  file: File,
+  onProgress: (percent: number) => void = () => undefined,
+): Promise<LessonVideoResult> {
+  const basePath = `${OWNER_API_BASE}/lessons/${lessonId}/video/uploads`;
+  const { upload } = await apiRequest<{ upload: LessonVideoUploadTicket }>(basePath, {
+    method: "POST",
+    body: JSON.stringify({ fileName: file.name, contentType: file.type, sizeBytes: file.size }),
+  });
+
+  const completedParts: LessonVideoCompletedPart[] = [];
+  let completedBytes = 0;
+  const inFlightBytes = new Map<number, number>();
+  const reportProgress = () => {
+    const activeBytes = [...inFlightBytes.values()].reduce((total, bytes) => total + bytes, 0);
+    onProgress(Math.min(99, Math.round(((completedBytes + activeBytes) / file.size) * 100)));
+  };
+
+  try {
+    for (
+      let batchStart = 1;
+      batchStart <= upload.partCount;
+      batchStart += LESSON_VIDEO_PART_BATCH_SIZE
+    ) {
+      const partNumbers = Array.from(
+        { length: Math.min(LESSON_VIDEO_PART_BATCH_SIZE, upload.partCount - batchStart + 1) },
+        (_, index) => batchStart + index,
+      );
+      const { parts } = await apiRequest<{ parts: LessonVideoPartUrlResult[] }>(
+        `${basePath}/parts`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            objectKey: upload.objectKey,
+            uploadId: upload.uploadId,
+            partNumbers,
+          }),
+        },
+      );
+
+      let nextIndex = 0;
+      const workers = Array.from(
+        { length: Math.min(LESSON_VIDEO_UPLOAD_CONCURRENCY, parts.length) },
+        async () => {
+          while (nextIndex < parts.length) {
+            const part = parts[nextIndex];
+            nextIndex += 1;
+            const start = (part.partNumber - 1) * upload.partSizeBytes;
+            const blob = file.slice(start, Math.min(start + upload.partSizeBytes, file.size));
+            const completed = await uploadVideoPartWithRetry(part, blob, (loadedBytes) => {
+              inFlightBytes.set(part.partNumber, loadedBytes);
+              reportProgress();
+            });
+            inFlightBytes.delete(part.partNumber);
+            completedBytes += blob.size;
+            completedParts.push(completed);
+            reportProgress();
+          }
+        },
+      );
+      await Promise.all(workers);
+    }
+
+    const { video } = await apiRequest<{ video: LessonVideoResult }>(`${basePath}/complete`, {
+      method: "POST",
+      body: JSON.stringify({
+        objectKey: upload.objectKey,
+        uploadId: upload.uploadId,
+        fileName: file.name,
+        contentType: file.type,
+        expectedSizeBytes: file.size,
+        parts: completedParts.sort((a, b) => a.partNumber - b.partNumber),
+      }),
+    });
+    onProgress(100);
+    return video;
+  } catch (error) {
+    await apiRequest(`${basePath}/abort`, {
+      method: "POST",
+      body: JSON.stringify({ objectKey: upload.objectKey, uploadId: upload.uploadId }),
+    }).catch(() => undefined);
+    throw error;
+  }
 }
 
 // -------------------------------------------------------------------------

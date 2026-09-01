@@ -8,6 +8,8 @@ import type {
   OwnerSectionReorderResult,
 } from "@/contracts/owner-courses";
 import { ApiError } from "@/server/http/errors";
+import { logger } from "@/server/observability/logger";
+import { deleteObject, deleteObjects } from "@/server/storage/r2";
 import {
   clampInsertPosition,
   reorderedSectionPositions,
@@ -142,11 +144,15 @@ export async function renameSection(
   });
 }
 
-// Query budget (inside tx): 4 (section, delete, lesson aggregate, course
-// counter update). Deleting the section cascades its lessons.
+// Query budget (inside tx): 5 (section, media keys, delete, lesson aggregate,
+// course counter update). Deleting the section cascades its lessons.
 export async function deleteSection(sectionId: string): Promise<OwnerChildDeletedResult> {
-  return withTransaction(async (transaction) => {
+  const result = await withTransaction(async (transaction) => {
     const section = await loadSection(transaction, sectionId);
+    const media = await transaction.lesson.findMany({
+      where: { sectionId, videoKey: { not: null } },
+      select: { videoKey: true },
+    });
 
     await transaction.courseSection.delete({ where: { id: sectionId }, select: { id: true } });
 
@@ -162,8 +168,16 @@ export async function deleteSection(sectionId: string): Promise<OwnerChildDelete
       select: { version: true },
     });
 
-    return { courseId: section.courseId, courseVersion: updatedCourse.version };
+    return {
+      response: { courseId: section.courseId, courseVersion: updatedCourse.version },
+      removedVideoKeys: media.flatMap((item) => (item.videoKey ? [item.videoKey] : [])),
+    };
   });
+
+  await deleteObjects(result.removedVideoKeys).catch((error: unknown) => {
+    logger.warn("Deleted section videos could not be removed", { sectionId, error });
+  });
+  return result.response;
 }
 
 // Query budget (inside tx): 2 + n (section load, sibling list, offset write,
@@ -260,18 +274,35 @@ export async function updateLesson(
   lessonId: string,
   input: LessonUpdateInput,
 ): Promise<OwnerLessonMutationResult> {
-  return withTransaction(async (transaction) => {
+  const result = await withTransaction(async (transaction) => {
     const lesson = await transaction.lesson.findUnique({
       where: { id: lessonId },
-      select: { id: true, sectionId: true, courseId: true, durationSeconds: true },
+      select: {
+        id: true,
+        sectionId: true,
+        courseId: true,
+        durationSeconds: true,
+        videoKey: true,
+      },
     });
     if (!lesson) throw new ApiError(404, "LESSON_NOT_FOUND", "The lesson was not found.");
 
     const { content, videoUrl, ...fields } = input;
+    const clearsUploadedVideo =
+      (input.type !== undefined && input.type !== "VIDEO") || typeof videoUrl === "string";
     const data: Prisma.LessonUncheckedUpdateInput = {
       ...fields,
       ...(content !== undefined ? { content } : {}),
       ...(videoUrl !== undefined ? { videoUrl } : {}),
+      ...(clearsUploadedVideo
+        ? {
+            videoKey: null,
+            videoFileName: null,
+            videoContentType: null,
+            videoSizeBytes: null,
+            videoUploadedAt: null,
+          }
+        : {}),
     };
 
     const updatedLesson = await transaction.lesson.update({
@@ -295,18 +326,32 @@ export async function updateLesson(
       select: { version: true },
     });
 
-    return { lesson: toOwnerLessonDto(updatedLesson), courseVersion: updatedCourse.version };
+    return {
+      response: { lesson: toOwnerLessonDto(updatedLesson), courseVersion: updatedCourse.version },
+      removedVideoKey: clearsUploadedVideo ? lesson.videoKey : null,
+    };
   });
+
+  if (result.removedVideoKey) {
+    deleteObject(result.removedVideoKey).catch((error: unknown) => {
+      logger.warn("Removed lesson video could not be deleted", {
+        lessonId,
+        objectKey: result.removedVideoKey,
+        error,
+      });
+    });
+  }
+  return result.response;
 }
 
 // Query budget (inside tx): 5 (lesson, delete, position renumber, lesson
 // aggregate, course counter update). Deleting first frees the position, so a
 // single decrement renumbers the remaining lessons.
 export async function deleteLesson(lessonId: string): Promise<OwnerChildDeletedResult> {
-  return withTransaction(async (transaction) => {
+  const result = await withTransaction(async (transaction) => {
     const lesson = await transaction.lesson.findUnique({
       where: { id: lessonId },
-      select: { id: true, sectionId: true, courseId: true, position: true },
+      select: { id: true, sectionId: true, courseId: true, position: true, videoKey: true },
     });
     if (!lesson) throw new ApiError(404, "LESSON_NOT_FOUND", "The lesson was not found.");
 
@@ -328,8 +373,22 @@ export async function deleteLesson(lessonId: string): Promise<OwnerChildDeletedR
       select: { version: true },
     });
 
-    return { courseId: lesson.courseId, courseVersion: updatedCourse.version };
+    return {
+      response: { courseId: lesson.courseId, courseVersion: updatedCourse.version },
+      removedVideoKey: lesson.videoKey,
+    };
   });
+
+  if (result.removedVideoKey) {
+    deleteObject(result.removedVideoKey).catch((error: unknown) => {
+      logger.warn("Deleted lesson video could not be removed", {
+        lessonId,
+        objectKey: result.removedVideoKey,
+        error,
+      });
+    });
+  }
+  return result.response;
 }
 
 // Query budget (inside tx): 8 (lesson, target section, park lesson, old

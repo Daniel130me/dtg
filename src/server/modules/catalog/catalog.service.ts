@@ -109,6 +109,7 @@ const courseDetailSelect = {
           isPreview: true,
           content: true,
           videoUrl: true,
+          videoKey: true,
         },
       },
     },
@@ -314,8 +315,9 @@ function toCourseDetailDto(row: CourseDetailRow): CourseDetailDto {
         durationSeconds: lesson.durationSeconds,
         isPreview: lesson.isPreview,
         // Empty bodies count as no content.
-        hasContent: Boolean(lesson.content),
-        videoUrl: lesson.videoUrl,
+        hasContent: Boolean(lesson.content || lesson.videoUrl || lesson.videoKey),
+        // Full lesson media is resolved through the access-checked learning API.
+        videoUrl: lesson.isPreview ? lesson.videoUrl : null,
       })),
     })),
     instructor: {

@@ -808,6 +808,68 @@ export const openApiDocument = {
         },
       },
     },
+    "/owner/lessons/{lessonId}/video/uploads": {
+      post: {
+        operationId: "initiateLessonVideoUpload",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Private R2 multipart lecture upload initiated." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Lesson not found." },
+          "422": { description: "Unsupported video type, invalid size, or non-video lesson." },
+          "503": { description: "Course media storage is not configured." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}/video/uploads/parts": {
+      post: {
+        operationId: "signLessonVideoUploadParts",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Bounded batch of short-lived multipart part URLs created." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Invalid object key, upload ID, or part numbers." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}/video/uploads/complete": {
+      post: {
+        operationId: "completeLessonVideoUpload",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Multipart video verified and attached to the lesson." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "Parts, content type, or final object size failed verification." },
+        },
+      },
+    },
+    "/owner/lessons/{lessonId}/video/uploads/abort": {
+      post: {
+        operationId: "abortLessonVideoUpload",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "lessonId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Incomplete multipart upload aborted." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "422": { description: "The upload object does not belong to the lesson." },
+        },
+      },
+    },
     "/owner/courses/{courseId}": {
       get: {
         operationId: "getOwnerCourse",

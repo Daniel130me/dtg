@@ -83,6 +83,7 @@ import {
   updateCourse,
   updateLesson,
   uploadCourseThumbnail,
+  uploadLessonVideo,
 } from '@/features/owner/api';
 import {
   COURSE_STATUS_BADGE_CLASS,
@@ -114,6 +115,10 @@ import {
   COURSE_THUMBNAIL_CONTENT_TYPES,
   MAX_COURSE_THUMBNAIL_BYTES,
 } from '@/contracts/course-media';
+import {
+  LESSON_VIDEO_CONTENT_TYPES,
+  MAX_LESSON_VIDEO_BYTES,
+} from '@/contracts/lesson-video';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
 
@@ -892,17 +897,49 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
     });
   };
 
-  const handleLessonCreate = (sectionId: string, body: LessonCreateBody): Promise<void> =>
-    withBusy(async () => {
-      await createLesson(sectionId, body);
-      toast.success('Lesson added.');
-    });
+  const handleLessonCreate = async (
+    sectionId: string,
+    body: LessonCreateBody,
+    videoFile: File | null,
+    onProgress: (percent: number) => void,
+  ): Promise<boolean> => {
+    setBusy(true);
+    try {
+      const result = await createLesson(sectionId, body);
+      if (videoFile) await uploadLessonVideo(result.lesson.id, videoFile, onProgress);
+      await onRefetch();
+      toast.success(videoFile ? 'Lesson and lecture video added.' : 'Lesson added.');
+      return true;
+    } catch (error) {
+      showActionErrorToast(error, 'The lesson or its lecture video could not be saved.');
+      await onRefetch().catch(() => undefined);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const handleLessonUpdate = (lessonId: string, body: LessonUpdateBody): Promise<void> =>
-    withBusy(async () => {
+  const handleLessonUpdate = async (
+    lessonId: string,
+    body: LessonUpdateBody,
+    videoFile: File | null,
+    onProgress: (percent: number) => void,
+  ): Promise<boolean> => {
+    setBusy(true);
+    try {
       await updateLesson(lessonId, body);
-      toast.success('Lesson updated.');
-    });
+      if (videoFile) await uploadLessonVideo(lessonId, videoFile, onProgress);
+      await onRefetch();
+      toast.success(videoFile ? 'Lesson and lecture video updated.' : 'Lesson updated.');
+      return true;
+    } catch (error) {
+      showActionErrorToast(error, 'The lesson or its lecture video could not be saved.');
+      await onRefetch().catch(() => undefined);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleLessonDelete = (): Promise<void> => {
     if (!lessonDeleteTarget) return Promise.resolve();
@@ -1041,6 +1078,11 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                       {lesson.isPreview && (
                         <Badge variant="secondary" className="text-xs shrink-0">
                           Preview
+                        </Badge>
+                      )}
+                      {lesson.type === 'VIDEO' && lesson.videoFileName && (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          Video uploaded
                         </Badge>
                       )}
                       <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
@@ -1356,8 +1398,18 @@ interface LessonDialogProps {
   state: NonNullable<LessonDialogState>;
   busy: boolean;
   onClose: () => void;
-  onCreate: (sectionId: string, body: LessonCreateBody) => Promise<void>;
-  onUpdate: (lessonId: string, body: LessonUpdateBody) => Promise<void>;
+  onCreate: (
+    sectionId: string,
+    body: LessonCreateBody,
+    videoFile: File | null,
+    onProgress: (percent: number) => void,
+  ) => Promise<boolean>;
+  onUpdate: (
+    lessonId: string,
+    body: LessonUpdateBody,
+    videoFile: File | null,
+    onProgress: (percent: number) => void,
+  ) => Promise<boolean>;
 }
 
 function LessonDialog({ state, busy, onClose, onCreate, onUpdate }: LessonDialogProps) {
@@ -1372,7 +1424,18 @@ function LessonDialog({ state, busy, onClose, onCreate, onUpdate }: LessonDialog
   );
   const [isPreview, setIsPreview] = useState(lesson?.isPreview ?? false);
   const [content, setContent] = useState(lesson?.content ?? '');
-  const [videoUrl, setVideoUrl] = useState(lesson?.videoUrl ?? '');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  useEffect(() => {
+    if (!busy || !videoFile) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [busy, videoFile]);
 
   const durationSeconds = Math.round((Number(durationMinutes) || 0) * 60);
 
@@ -1383,32 +1446,33 @@ function LessonDialog({ state, busy, onClose, onCreate, onUpdate }: LessonDialog
       const createBody = {
         ...shared,
         ...(type === 'TEXT' && content.trim() !== '' ? { content } : {}),
-        ...(type === 'VIDEO' && videoUrl.trim() !== '' ? { videoUrl } : {}),
       };
       const parsed = lessonCreateSchema.safeParse(createBody);
       if (!parsed.success) {
         showValidationIssuesToast(parsed.error, 'Please fix the highlighted lesson fields.');
         return;
       }
-      await onCreate(state.section.id, parsed.data);
+      const saved = await onCreate(state.section.id, parsed.data, videoFile, setUploadProgress);
+      if (!saved) return;
     } else {
       const updateBody = {
         ...shared,
         content: type === 'TEXT' ? content : null,
-        videoUrl: type === 'VIDEO' ? videoUrl : null,
+        videoUrl: type === 'VIDEO' ? state.lesson.videoUrl : null,
       };
       const parsed = lessonUpdateSchema.safeParse(updateBody);
       if (!parsed.success) {
         showValidationIssuesToast(parsed.error, 'Please fix the highlighted lesson fields.');
         return;
       }
-      await onUpdate(state.lesson.id, parsed.data);
+      const saved = await onUpdate(state.lesson.id, parsed.data, videoFile, setUploadProgress);
+      if (!saved) return;
     }
     onClose();
   };
 
   return (
-    <Dialog open={state !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={state !== null} onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit lesson' : 'Add lesson'}</DialogTitle>
@@ -1472,13 +1536,50 @@ function LessonDialog({ state, busy, onClose, onCreate, onUpdate }: LessonDialog
           )}
           {type === 'VIDEO' && (
             <div className="space-y-2">
-              <Label htmlFor="lesson-video">Video URL</Label>
+              <Label htmlFor="lesson-video">Recorded lecture video</Label>
               <Input
                 id="lesson-video"
-                value={videoUrl}
-                onChange={(event) => setVideoUrl(event.target.value)}
-                placeholder="https://youtube.com/watch?v=..."
+                type="file"
+                accept={LESSON_VIDEO_CONTENT_TYPES.join(',')}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  if (!file) {
+                    setVideoFile(null);
+                    return;
+                  }
+                  if (!(LESSON_VIDEO_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+                    toast.error('Choose an MP4 or WebM lecture video.');
+                    event.target.value = '';
+                    return;
+                  }
+                  if (file.size > MAX_LESSON_VIDEO_BYTES) {
+                    toast.error('The lecture video must be 20 GB or smaller.');
+                    event.target.value = '';
+                    return;
+                  }
+                  setVideoFile(file);
+                }}
               />
+              <p className="text-xs text-muted-foreground">
+                {videoFile
+                  ? `${videoFile.name} (${(videoFile.size / 1024 / 1024).toFixed(1)} MB)`
+                  : lesson?.videoFileName
+                    ? `Current: ${lesson.videoFileName}${lesson.videoSizeBytes ? ` (${(lesson.videoSizeBytes / 1024 / 1024).toFixed(1)} MB)` : ''}`
+                    : 'MP4 or WebM, up to 20 GB. Large uploads are split into retryable parts.'}
+              </p>
+              {busy && videoFile && uploadProgress > 0 && (
+                <div className="space-y-1">
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-[width]"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Uploading {uploadProgress}% — keep this dialog open.
+                  </p>
+                </div>
+              )}
             </div>
           )}
           <div className="flex items-center gap-3">

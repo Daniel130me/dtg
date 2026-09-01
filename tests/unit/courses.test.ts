@@ -105,6 +105,22 @@ describe("publish check assembly", () => {
     assert.equal(issues.length, 1);
     assert.equal(issues[0].field, "sections");
   });
+
+  it("blocks publishing when a video lesson has no lecture media", () => {
+    const issues = collectPublishIssues({
+      ...publishableCourse,
+      sections: [
+        {
+          id: UUID,
+          title: "Recorded lectures",
+          lessonCount: 1,
+          missingVideoTitles: ["Introduction"],
+        },
+      ],
+    });
+    assert.equal(issues.length, 1);
+    assert.match(issues[0].message, /Introduction/);
+  });
 });
 
 describe("position renumbering math", () => {

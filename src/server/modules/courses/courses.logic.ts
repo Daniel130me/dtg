@@ -59,7 +59,12 @@ export interface PublishCheckInput {
   description: string;
   categoryId: string;
   priceMinor: number;
-  sections: Array<{ id: string; title: string; lessonCount: number }>;
+  sections: Array<{
+    id: string;
+    title: string;
+    lessonCount: number;
+    missingVideoTitles?: string[];
+  }>;
 }
 
 export interface PublishIssue {
@@ -101,6 +106,12 @@ export function collectPublishIssues(course: PublishCheckInput): PublishIssue[] 
       issues.push({
         field: "sections",
         message: `Section "${section.title}" needs at least one lesson.`,
+      });
+    }
+    for (const lessonTitle of section.missingVideoTitles ?? []) {
+      issues.push({
+        field: "sections",
+        message: `Video lesson "${lessonTitle}" needs a lecture video before publishing.`,
       });
     }
   }
@@ -172,6 +183,10 @@ interface LessonRow {
   isPreview: boolean;
   content: string | null;
   videoUrl: string | null;
+  videoFileName: string | null;
+  videoContentType: string | null;
+  videoSizeBytes: bigint | null;
+  videoUploadedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -206,6 +221,10 @@ export function toOwnerLessonDto(lesson: LessonRow): OwnerLessonDto {
     isPreview: lesson.isPreview,
     content: lesson.content,
     videoUrl: lesson.videoUrl,
+    videoFileName: lesson.videoFileName,
+    videoContentType: lesson.videoContentType,
+    videoSizeBytes: lesson.videoSizeBytes === null ? null : Number(lesson.videoSizeBytes),
+    videoUploadedAt: lesson.videoUploadedAt?.toISOString() ?? null,
     createdAt: lesson.createdAt.toISOString(),
     updatedAt: lesson.updatedAt.toISOString(),
   };

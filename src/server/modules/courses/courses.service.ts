@@ -10,6 +10,7 @@ import { db } from "@/server/db/client";
 import { withTransaction } from "@/server/db/transaction";
 import { ApiError } from "@/server/http/errors";
 import { decodeCursor, encodeCursor } from "@/server/http/pagination";
+import { logger } from "@/server/observability/logger";
 import {
   toOwnerCourseDetailDto,
   toOwnerCourseListItemDto,
@@ -309,7 +310,15 @@ export async function publishCourse(
         priceMinor: true,
         status: true,
         sections: {
-          select: { id: true, title: true, _count: { select: { lessons: true } } },
+          select: {
+            id: true,
+            title: true,
+            _count: { select: { lessons: true } },
+            lessons: {
+              where: { type: "VIDEO" },
+              select: { title: true, videoUrl: true, videoKey: true },
+            },
+          },
         },
       },
     });
@@ -329,6 +338,9 @@ export async function publishCourse(
         id: section.id,
         title: section.title,
         lessonCount: section._count.lessons,
+        missingVideoTitles: section.lessons
+          .filter((lesson) => !lesson.videoKey && !lesson.videoUrl)
+          .map((lesson) => lesson.title),
       })),
     });
     if (issues.length > 0) {
@@ -468,17 +480,17 @@ export async function unpublishCourse(
   });
 }
 
-// Query budget (inside tx): 3 (load, delete, audit). Draft-only; sections and
-// lessons are removed by cascading deletes.
+// Query budget (inside tx): 4 (load, media keys, delete, audit). Draft-only;
+// sections and lessons are removed by cascading deletes.
 export async function deleteCourse(
   actorId: string,
   courseId: string,
   requestId?: string,
 ): Promise<{ id: string }> {
-  return withTransaction(async (transaction) => {
+  const result = await withTransaction(async (transaction) => {
     const course = await transaction.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, slug: true, status: true },
+      select: { id: true, title: true, slug: true, status: true, thumbnailKey: true },
     });
     if (!course) throw new ApiError(404, "COURSE_NOT_FOUND", "The course was not found.");
 
@@ -489,6 +501,11 @@ export async function deleteCourse(
         "Only draft courses can be deleted. Archive the course first.",
       );
     }
+
+    const lessonMedia = await transaction.lesson.findMany({
+      where: { courseId, videoKey: { not: null } },
+      select: { videoKey: true },
+    });
 
     await transaction.course.delete({ where: { id: courseId }, select: { id: true } });
 
@@ -504,6 +521,20 @@ export async function deleteCourse(
       select: { id: true },
     });
 
-    return { id: courseId };
+    return {
+      response: { id: courseId },
+      removedObjectKeys: [
+        ...(course.thumbnailKey ? [course.thumbnailKey] : []),
+        ...lessonMedia.flatMap((lesson) => (lesson.videoKey ? [lesson.videoKey] : [])),
+      ],
+    };
   });
+
+  // Lazy loading keeps read/create paths independent of the optional media
+  // adapter and its server-only runtime marker.
+  const { deleteObjects } = await import("@/server/storage/r2");
+  await deleteObjects(result.removedObjectKeys).catch((error: unknown) => {
+    logger.warn("Deleted course media could not be removed", { courseId, error });
+  });
+  return result.response;
 }
