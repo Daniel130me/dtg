@@ -67,6 +67,7 @@ import {
 import InstructorLayout from './InstructorLayout';
 import QuizBuilder from './quiz-builder';
 import AssignmentEditor from './assignment-editor';
+import CoursePreviewDialog from './CoursePreviewDialog';
 import {
   archiveCourse,
   createLesson,
@@ -199,6 +200,7 @@ export default function CourseEditorPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [lifecycleBusy, setLifecycleBusy] = useState<LifecycleAction | null>(null);
   const [confirmAction, setConfirmAction] = useState<LifecycleAction | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'metadata' | 'media' | 'curriculum'>(() =>
     searchParams.get('tab') === 'curriculum' ? 'curriculum' : 'metadata',
   );
@@ -330,6 +332,10 @@ export default function CourseEditorPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+                  <BookOpenCheck className="size-4 mr-2" />
+                  Preview course
+                </Button>
                 {course.status === 'PUBLISHED' && (
                   <Button variant="outline" size="sm" asChild>
                     <a href={`/courses/${course.slug}`} target="_blank" rel="noreferrer">
@@ -426,6 +432,25 @@ export default function CourseEditorPage() {
           <div className="h-8" />
         </motion.div>
       </div>
+
+      <CoursePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        title={course.title}
+        shortDescription={course.shortDescription}
+        description={course.description}
+        categoryName={course.category?.name ?? ''}
+        level={course.level}
+        language={course.language}
+        sections={course.sections.map((section) => ({
+          title: section.title,
+          lessons: section.lessons.map((lesson) => ({
+            title: lesson.title,
+            durationMinutes: Math.round(lesson.durationSeconds / 60),
+            isPreview: lesson.isPreview,
+          })),
+        }))}
+      />
 
       {/* Lifecycle confirmation dialog */}
       <AlertDialog

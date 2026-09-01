@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
+  BookOpen,
   ImageIcon,
   Layers,
   Link as LinkIcon,
@@ -25,6 +26,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +41,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import InstructorLayout from './InstructorLayout';
+import CoursePreviewDialog from './CoursePreviewDialog';
 import {
   createCourse,
   createOwnerCatalogOption,
@@ -131,6 +141,9 @@ export default function CreateCoursePage() {
   const [promoVideoUrl, setPromoVideoUrl] = useState('');
   const [curriculum, setCurriculum] = useState<DraftSection[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [catalogDialog, setCatalogDialog] = useState<'category' | 'level' | null>(null);
+  const [catalogName, setCatalogName] = useState('');
   const [videoUploadProgress, setVideoUploadProgress] = useState<{
     title: string;
     percent: number;
@@ -177,13 +190,15 @@ export default function CreateCoursePage() {
 
   const addCatalogOption = async (type: 'category' | 'level') => {
     const label = type === 'category' ? 'category' : 'level';
-    const name = window.prompt(`Enter a new ${label} name:`)?.trim();
+    const name = catalogName.trim();
     if (!name) return;
     try {
       await createOwnerCatalogOption(type, name);
       setCategoriesState('loading');
       setReloadToken((token) => token + 1);
       toast.success(`${name} added.`);
+      setCatalogName('');
+      setCatalogDialog(null);
     } catch (error) {
       showActionErrorToast(error, `The ${label} could not be added.`);
     }
@@ -482,7 +497,7 @@ export default function CreateCoursePage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Category</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addCatalogOption('category')}>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setCatalogDialog('category')}>
                         <Plus className="mr-1 size-3" /> Add
                       </Button>
                     </div>
@@ -515,7 +530,7 @@ export default function CreateCoursePage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Level</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addCatalogOption('level')}>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setCatalogDialog('level')}>
                         <Plus className="mr-1 size-3" /> Add
                       </Button>
                     </div>
@@ -883,6 +898,15 @@ export default function CreateCoursePage() {
                     Cancel
                   </Button>
                   <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPreviewOpen(true)}
+                    disabled={submitting}
+                    className="gap-2"
+                  >
+                    <BookOpen className="size-4" /> Preview course
+                  </Button>
+                  <Button
                     onClick={() => void handleSubmit()}
                     disabled={submitting || categoriesState !== 'ready'}
                     className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
@@ -918,6 +942,55 @@ export default function CreateCoursePage() {
           <div className="h-8" />
         </motion.div>
       </div>
+      <CoursePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        title={title}
+        shortDescription={shortDescription}
+        description={description}
+        categoryName={categories.find((category) => category.id === categoryId)?.name ?? ''}
+        level={level}
+        language={language}
+        sections={curriculum}
+      />
+      <Dialog
+        open={catalogDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCatalogDialog(null);
+            setCatalogName('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add {catalogDialog === 'category' ? 'category' : 'level'}</DialogTitle>
+            <DialogDescription>Create a reusable option for your course catalog.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="catalog-option-name">Name</Label>
+            <Input
+              id="catalog-option-name"
+              autoFocus
+              value={catalogName}
+              onChange={(event) => setCatalogName(event.target.value)}
+              placeholder={catalogDialog === 'category' ? 'e.g. Graphic Design' : 'e.g. Professional'}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (catalogDialog) void addCatalogOption(catalogDialog);
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCatalogDialog(null)}>Cancel</Button>
+            <Button type="button" onClick={() => catalogDialog && void addCatalogOption(catalogDialog)} disabled={!catalogName.trim()}>
+              Add {catalogDialog === 'category' ? 'category' : 'level'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </InstructorLayout>
   );
 }
