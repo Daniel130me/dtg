@@ -23,19 +23,7 @@ import {
   PlayCircle,
   X,
 } from 'lucide-react';
-<<<<<<< HEAD
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-=======
-import { useNav } from '@/lib/prototype/navigation';
-import { useStudentData } from '@/lib/prototype/student-data';
-import { courses } from '@/lib/prototype/mock-data';
-import type { Lesson } from '@/lib/prototype/types';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -119,7 +107,6 @@ function PlayerSkeleton() {
   );
 }
 
-<<<<<<< HEAD
 // --- Curriculum sidebar (shared by the desktop aside and the mobile drawer) --
 
 interface PlayerCurriculumProps {
@@ -133,20 +120,6 @@ interface PlayerCurriculumProps {
   /** Lets the mobile drawer close itself when a lesson row is clicked. */
   onLessonClick?: () => void;
 }
-=======
-export default function LearningPlayerPage() {
-  const { navigate, viewParams } = useNav();
-  const { enrolments, updateLessonProgress } = useStudentData();
-  const [curriculumOpen, setCurriculumOpen] = useState(false);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['sec-1']));
-  const [notes, setNotes] = useState('');
-  const [question, setQuestion] = useState('');
-
-  // Get course
-  const courseId = viewParams.courseId || 'course-1';
-  const course = courses.find((c) => c.id === courseId) || courses[0];
-  const currentEnrolment = enrolments.find((e) => e.courseId === course.id);
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
 function PlayerCurriculum({ slug, lessonId, progress, completedSet, totals, showPreviewBadges, onLessonClick }: PlayerCurriculumProps) {
   // The accordion follows the current lesson's section until the learner
@@ -157,7 +130,6 @@ function PlayerCurriculum({ slug, lessonId, progress, completedSet, totals, show
     null;
   const accordionValue = openSections ?? (currentSectionId ? [currentSectionId] : []);
 
-<<<<<<< HEAD
   return (
     <div className='flex flex-col h-full'>
       <div className='p-4 border-b space-y-3'>
@@ -183,65 +155,6 @@ function PlayerCurriculum({ slug, lessonId, progress, completedSet, totals, show
           <p className='text-xs text-muted-foreground mt-1.5'>
             {totals.completedLessons} of {totals.totalLessons} lessons completed
           </p>
-=======
-  // Current lesson
-  const lessonId = viewParams.lessonId || 'les-1';
-  const currentIndex = allLessons.findIndex((l) => l.id === lessonId);
-  const currentLesson = allLessons[currentIndex] || allLessons[0];
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < allLessons.length - 1;
-
-  // Calculate progress
-  const completedCount = allLessons.filter((l) => l.isCompleted).length;
-  const progressPercent = currentEnrolment ? currentEnrolment.progress : Math.round((completedCount / allLessons.length) * 100);
-
-  const toggleSection = (secId: string) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(secId)) {
-        next.delete(secId);
-      } else {
-        next.add(secId);
-      }
-      return next;
-    });
-  };
-
-  const selectLesson = (les: Pick<Lesson, 'id'>) => {
-    navigate('learning-player', { courseId: course.id, lessonId: les.id });
-  };
-
-  const goNext = () => {
-    updateLessonProgress(course.id, currentLesson.id, true);
-    if (hasNext) {
-      const next = allLessons[currentIndex + 1];
-      navigate('learning-player', { courseId: course.id, lessonId: next.id });
-    }
-  };
-
-  const goPrev = () => {
-    if (hasPrev) {
-      const prev = allLessons[currentIndex - 1];
-      navigate('learning-player', { courseId: course.id, lessonId: prev.id });
-    }
-  };
-
-  const currentResources = mockResources[currentLesson.id] || [];
-  const currentDescription = lessonDescriptions[currentLesson.id] ||
-    `This ${currentLesson.type} lesson covers ${currentLesson.title}. Follow along with the instructor to build practical skills and deepen your understanding of the topic.`;
-
-  // Curriculum sidebar content (shared between desktop and mobile)
-  const curriculumContent = (
-    <div className="space-y-1">
-      {/* Course header inside sidebar */}
-      <div className="p-4 border-b">
-        <h3 className="font-semibold text-sm line-clamp-2">{course.title}</h3>
-        <div className="flex items-center gap-2 mt-2">
-          <Progress value={progressPercent} className="h-1.5 flex-1" />
-          <span className="text-xs font-medium text-muted-foreground shrink-0">
-            {progressPercent}%
-          </span>
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
         </div>
       </div>
 

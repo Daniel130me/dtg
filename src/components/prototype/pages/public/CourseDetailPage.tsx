@@ -11,7 +11,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import StarRating from '@/components/prototype/shared/StarRating';
-<<<<<<< HEAD
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import CourseReviewsSection from '@/components/prototype/pages/public/CourseReviewsSection';
 import { fetchCourseDetail } from '@/features/catalog/api';
@@ -22,11 +21,6 @@ import { formatCount, formatDuration, formatLessonDuration, formatLevel, formatP
 import type { CourseDetailDto, CourseLessonDto } from '@/contracts/catalog';
 import { PAYMENT_PROVIDER_NOT_CONFIGURED, type CourseEnrolmentStateDto } from '@/contracts/enrolments';
 import { CHECKOUT_RETURN_PARAM, type OrderStatusDto } from '@/contracts/payments';
-=======
-import { useNav } from '@/lib/prototype/navigation';
-import { useStudentData } from '@/lib/prototype/student-data';
-import { courses, reviews } from '@/lib/prototype/mock-data';
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
 type DetailLessonType = CourseLessonDto['type'];
 
@@ -116,21 +110,12 @@ function DetailSkeleton() {
 }
 
 export default function CourseDetailPage() {
-<<<<<<< HEAD
   const params = useParams<{ courseId: string }>();
   const router = useRouter();
   // The route segment is named `[courseId]` for prototype-historical reasons, but
   // its value is the course SLUG (e.g. /courses/nextjs-masterclass) — the catalog
   // API looks courses up by slug, so we treat it as one.
   const slug = params.courseId;
-=======
-  const { navigate, isAuthenticated, viewParams } = useNav();
-  const { enrolments, enrollInCourse } = useStudentData();
-  const courseId = viewParams.courseId || 'course-1';
-  const course = courses.find(c => c.id === courseId) || courses[0];
-  const courseReviews = reviews.filter(r => r.courseId === course.id);
-  const enrollment = enrolments.find(e => e.courseId === course.id);
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
   // Loading is DERIVED from the request key (see HomePage) so effects never
   // call setState synchronously; all state writes happen in async callbacks.
@@ -322,12 +307,6 @@ export default function CourseDetailPage() {
     } finally {
       setEnrolling(false);
     }
-<<<<<<< HEAD
-=======
-    enrollInCourse(course.id);
-    const firstLessonId = course.sections[0]?.lessons[0]?.id || 'les-1';
-    navigate('learning-player', { courseId: course.id, lessonId: firstLessonId });
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
   };
 
   // Paid course: create a hosted-checkout session and leave the app entirely —

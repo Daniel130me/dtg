@@ -8,10 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import NotificationsBell from '@/components/prototype/layout/NotificationsBell';
 import { useNav } from '@/lib/prototype/navigation';
-<<<<<<< HEAD
-=======
-import { useStudentData } from '@/lib/prototype/student-data';
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import type { ViewName } from '@/lib/prototype/types';
 
 const navLinks = [
@@ -23,7 +19,6 @@ const navLinks = [
 
 export default function Header() {
   const { currentView, navigate, isAuthenticated, userRole, userName, logout } = useNav();
-  const { notifications } = useStudentData();
   const [mobileOpen, setMobileOpen] = useState(false);
   const initials = userName
     ?.split(/\s+/)

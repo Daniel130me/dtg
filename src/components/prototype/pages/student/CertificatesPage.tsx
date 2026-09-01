@@ -15,12 +15,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
-<<<<<<< HEAD
 import { toast } from 'sonner';
-=======
-import { useNav } from '@/lib/prototype/navigation';
-import { useStudentData } from '@/lib/prototype/student-data';
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 import StudentLayout from '@/components/prototype/layout/StudentLayout';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { ApiClientError } from '@/lib/client/api-client';
@@ -37,13 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 
-<<<<<<< HEAD
 // --- Display helpers ----------------------------------------------------------
-=======
-export default function CertificatesPage() {
-  const { navigate } = useNav();
-  const { certificates } = useStudentData();
->>>>>>> ce2a251 (feat(student-data): implement StudentDataProvider for managing enrolments, certificates, and notifications)
 
 /** Status -> Badge mapping (Active/Revoked), mirroring MyLearningPage's enrolment map. */
 const STATUS_BADGE: Record<CertificateStatusValue, { label: string; variant: 'default' | 'destructive' }> = {
