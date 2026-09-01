@@ -1,4 +1,4 @@
-import { PrismaClient, CourseLevel, CourseStatus, EnrolmentSource, LessonType } from "@prisma/client";
+import { PrismaClient, CourseStatus, EnrolmentSource, LessonType } from "@prisma/client";
 import {
   categories as mockCategories,
   courses as mockCourses,
@@ -239,7 +239,7 @@ async function seedCourse(course: MockCourse, creatorUserId: string): Promise<vo
   const priceMinor = course.price === null ? 0 : Math.round(course.price * 100);
   const status: CourseStatus = course.isPublished ? "PUBLISHED" : "DRAFT";
   const publishedAt = course.isPublished ? new Date(course.lastUpdated) : null;
-  const level = course.level.toUpperCase() as CourseLevel;
+  const level = course.level;
 
   const category = await prisma.category.findUnique({
     where: { slug: slugify(course.categoryName) },

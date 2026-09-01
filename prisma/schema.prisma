@@ -19,12 +19,6 @@ enum UserRole {
   OWNER
 }
 
-enum CourseLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-}
-
 enum CourseStatus {
   DRAFT
   PUBLISHED
@@ -293,6 +287,17 @@ model Category {
   @@index([status, sortOrder])
 }
 
+model CourseLevelOption {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique @db.VarChar(80)
+  name      String   @db.VarChar(80)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder, name])
+}
+
 enum CategoryStatus {
   ACTIVE
   INACTIVE
@@ -311,7 +316,7 @@ model Course {
   promoVideoUrl    String?      @db.VarChar(2048)
   categoryId       String       @db.Uuid
   creatorUserId    String       @db.Uuid
-  level            CourseLevel
+  level            String       @db.VarChar(80)
   language         String       @default("English") @db.VarChar(32)
   // Money uses integer minor units; a zero price marks the course free.
   priceMinor       Int

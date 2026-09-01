@@ -21,12 +21,11 @@ export const NEW_BADGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 /** Courses with at least this many enrolments carry the "popular" badge. */
 export const POPULAR_ENROLLMENT_THRESHOLD = 2500;
 
-export const COURSE_LEVELS = ["BEGINNER", "INTERMEDIATE", "ADVANCED"] as const;
 export const COURSE_PRICE_FILTERS = ["ALL", "FREE", "PAID"] as const;
 export const COURSE_SORTS = ["NEWEST", "POPULAR", "RATING", "PRICE_ASC", "PRICE_DESC"] as const;
 export const LESSON_TYPES = ["VIDEO", "TEXT", "QUIZ", "ASSIGNMENT"] as const;
 
-export type CourseLevel = (typeof COURSE_LEVELS)[number];
+export type CourseLevel = string;
 export type CoursePriceFilter = (typeof COURSE_PRICE_FILTERS)[number];
 export type CourseSortKey = (typeof COURSE_SORTS)[number];
 export type LessonType = (typeof LESSON_TYPES)[number];
@@ -70,7 +69,7 @@ export function deriveBadge(course: BadgeableCourse, now: Date = new Date()): Co
 export const courseListQuerySchema = z.object({
   search: z.string().max(COURSE_SEARCH_MAX_LENGTH).optional(),
   category: z.string().min(1).max(CATEGORY_SLUG_MAX_LENGTH).optional(),
-  level: z.enum(COURSE_LEVELS).optional(),
+  level: z.string().trim().min(1).max(80).optional(),
   price: z.enum(COURSE_PRICE_FILTERS).default("ALL"),
   sort: z.enum(COURSE_SORTS).default("NEWEST"),
   cursor: z.string().optional(),
@@ -98,7 +97,7 @@ export const courseListItemDtoSchema = z.object({
   slug: z.string(),
   title: z.string(),
   shortDescription: z.string(),
-  level: z.enum(COURSE_LEVELS),
+  level: z.string().trim().min(1).max(80),
   language: z.string(),
   priceMinor: z.number().int(),
   currency: z.string(),
@@ -176,3 +175,12 @@ export const categoryDtoSchema = z.object({
 });
 
 export type CategoryDto = z.infer<typeof categoryDtoSchema>;
+
+export const catalogOptionDtoSchema = z.object({
+  id: z.uuid(),
+  slug: z.string(),
+  name: z.string(),
+  sortOrder: z.number().int(),
+});
+
+export type CatalogOptionDto = z.infer<typeof catalogOptionDtoSchema>;

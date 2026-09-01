@@ -34,6 +34,8 @@ import {
 import InstructorLayout from './InstructorLayout';
 import {
   createCourse,
+  createOwnerCatalogOption,
+  listOwnerCatalogOptions,
   listCategories,
   uploadCourseThumbnail,
   uploadLessonVideo,
@@ -44,7 +46,6 @@ import {
 } from '@/features/owner/toast-helpers';
 import {
   createCourseSchema,
-  COURSE_LEVELS,
   LESSON_TYPES,
 } from '@/contracts/owner-courses';
 import type { CourseLevelValue, LessonTypeValue } from '@/contracts/owner-courses';
@@ -114,6 +115,7 @@ export default function CreateCoursePage() {
   const router = useRouter();
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string }[]>([]);
   const [categoriesState, setCategoriesState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -140,10 +142,11 @@ export default function CreateCoursePage() {
   // synchronously inside the effect body (react-hooks/set-state-in-effect).
   useEffect(() => {
     let cancelled = false;
-    listCategories().then(
-      (list) => {
+    listOwnerCatalogOptions().then(
+      ({ categories: categoryList, levels: levelList }) => {
         if (cancelled) return;
-        setCategories(list);
+        setCategories(categoryList);
+        setLevels(levelList);
         setCategoriesState('ready');
       },
       (error: unknown) => {
@@ -170,6 +173,20 @@ export default function CreateCoursePage() {
   const retryCategories = () => {
     setCategoriesState('loading');
     setReloadToken((token) => token + 1);
+  };
+
+  const addCatalogOption = async (type: 'category' | 'level') => {
+    const label = type === 'category' ? 'category' : 'level';
+    const name = window.prompt(`Enter a new ${label} name:`)?.trim();
+    if (!name) return;
+    try {
+      await createOwnerCatalogOption(type, name);
+      setCategoriesState('loading');
+      setReloadToken((token) => token + 1);
+      toast.success(`${name} added.`);
+    } catch (error) {
+      showActionErrorToast(error, `The ${label} could not be added.`);
+    }
   };
 
   const effectivePriceMinor = isFree ? 0 : parsePriceToMinor(priceInput);
@@ -463,7 +480,12 @@ export default function CreateCoursePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Category</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Category</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => addCatalogOption('category')}>
+                        <Plus className="mr-1 size-3" /> Add
+                      </Button>
+                    </div>
                     {categoriesState === 'loading' ? (
                       <Skeleton className="h-9 w-full" />
                     ) : categoriesState === 'error' ? (
@@ -491,7 +513,12 @@ export default function CreateCoursePage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Level</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Level</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => addCatalogOption('level')}>
+                        <Plus className="mr-1 size-3" /> Add
+                      </Button>
+                    </div>
                     <Select
                       value={level === '' ? undefined : level}
                       onValueChange={(value) => setLevel(value as CourseLevelValue)}
@@ -500,9 +527,9 @@ export default function CreateCoursePage() {
                         <SelectValue placeholder="Select level" />
                       </SelectTrigger>
                       <SelectContent>
-                        {COURSE_LEVELS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {formatLevel(option)}
+                        {levels.map((option) => (
+                          <SelectItem key={option.id} value={option.name}>
+                            {formatLevel(option.name)}
                           </SelectItem>
                         ))}
                       </SelectContent>

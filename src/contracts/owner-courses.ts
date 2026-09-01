@@ -8,12 +8,11 @@ import { z } from "zod";
 // must stay free of server-only imports (no @prisma/client runtime, no src/server).
 // The enum tuples below mirror the Prisma enum values in prisma/schema.prisma.
 
-export const COURSE_LEVELS = ["BEGINNER", "INTERMEDIATE", "ADVANCED"] as const;
 export const COURSE_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
 export const LESSON_TYPES = ["VIDEO", "TEXT", "QUIZ", "ASSIGNMENT"] as const;
 export const LESSON_STATUSES = ["DRAFT", "PUBLISHED"] as const;
 
-export const courseLevelSchema = z.enum(COURSE_LEVELS);
+export const courseLevelSchema = z.string().trim().min(1).max(80);
 export const courseStatusSchema = z.enum(COURSE_STATUSES);
 export const lessonTypeSchema = z.enum(LESSON_TYPES);
 export const lessonStatusSchema = z.enum(LESSON_STATUSES);

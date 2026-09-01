@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { CourseLevel, CourseStatus, LessonStatus, LessonType } from "@prisma/client";
+import type { CourseStatus, LessonStatus, LessonType } from "@prisma/client";
 import type {
   OwnerCourseDetailDto,
   OwnerCourseListItemDto,
@@ -154,7 +154,7 @@ interface CourseSummaryRow {
   slug: string;
   title: string;
   shortDescription: string;
-  level: CourseLevel;
+  level: string;
   language: string;
   priceMinor: number;
   currency: string;

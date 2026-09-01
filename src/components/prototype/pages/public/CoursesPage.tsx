@@ -12,7 +12,6 @@ import { CourseCardSkeleton, FetchErrorState } from '@/components/prototype/shar
 import { fetchCategories, fetchCourses, type CourseListQueryInput } from '@/features/catalog/api';
 import { formatLevel } from '@/lib/client/format';
 import {
-  COURSE_LEVELS,
   COURSE_PAGE_LIMIT_DEFAULT,
   COURSE_PRICE_FILTERS,
   COURSE_SORTS,
@@ -61,7 +60,7 @@ function CoursesPageContent() {
   // --- Filters live in the URL -------------------------------------------
   const urlSearch = searchParams.get('search') ?? '';
   const urlCategory = searchParams.get('category') ?? '';
-  const urlLevel = parseEnumParam(COURSE_LEVELS, searchParams.get('level'));
+  const urlLevel = searchParams.get('level') || undefined;
   const urlPriceRaw = parseEnumParam(COURSE_PRICE_FILTERS, searchParams.get('price'));
   const urlPrice = urlPriceRaw === SENTINEL_ALL ? undefined : urlPriceRaw;
   const urlSort = parseEnumParam(COURSE_SORTS, searchParams.get('sort')) ?? DEFAULT_SORT;
@@ -231,7 +230,7 @@ function CoursesPageContent() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={SENTINEL_ALL}>All Levels</SelectItem>
-              {COURSE_LEVELS.map((level) => (
+              {['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].map((level) => (
                 <SelectItem key={level} value={level}>{formatLevel(level)}</SelectItem>
               ))}
             </SelectContent>

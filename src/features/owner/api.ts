@@ -1,6 +1,6 @@
 import { apiRequest } from "@/lib/client/api-client";
 import type { CursorPage } from "@/contracts/api";
-import type { CategoryDto } from "@/contracts/catalog";
+import type { CategoryDto, CatalogOptionDto } from "@/contracts/catalog";
 import type {
   CourseThumbnailResult,
   ThumbnailUploadTicket,
@@ -41,6 +41,7 @@ import type { CourseStatusValue } from "@/contracts/owner-courses";
 
 const OWNER_API_BASE = "/api/v1/owner";
 const CATALOG_CATEGORIES_PATH = "/api/v1/catalog/categories";
+const OWNER_CATALOG_PATH = `${OWNER_API_BASE}/catalog`;
 
 export interface OwnerCourseListQuery {
   status?: CourseStatusValue;
@@ -401,4 +402,22 @@ export async function listCategories(): Promise<CategoryDto[]> {
     CATALOG_CATEGORIES_PATH,
   );
   return categories;
+}
+
+export async function listOwnerCatalogOptions(): Promise<{
+  categories: (CategoryDto & { sortOrder: number })[];
+  levels: CatalogOptionDto[];
+}> {
+  return apiRequest(`${OWNER_CATALOG_PATH}`);
+}
+
+export async function createOwnerCatalogOption(
+  type: "category" | "level",
+  name: string,
+): Promise<unknown> {
+  const { option } = await apiRequest<{ option: unknown }>(OWNER_CATALOG_PATH, {
+    method: "POST",
+    body: JSON.stringify({ type, name }),
+  });
+  return option;
 }

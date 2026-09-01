@@ -74,7 +74,7 @@ import {
   deleteLesson,
   deleteSection,
   getOwnerCourse,
-  listCategories,
+  listOwnerCatalogOptions,
   moveLesson,
   publishCourse,
   renameSection,
@@ -131,8 +131,6 @@ const item = {
   hidden: { opacity: 0, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
-
-const LEVEL_OPTIONS: CourseLevelValue[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
 const LESSON_TYPE_OPTIONS = lessonTypeSchema.options;
 
@@ -195,6 +193,7 @@ export default function CourseEditorPage() {
 
   const [course, setCourse] = useState<OwnerCourseDetailDto | null>(null);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string }[]>([]);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -208,11 +207,12 @@ export default function CourseEditorPage() {
   // synchronously inside the effect (react-hooks/set-state-in-effect).
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getOwnerCourse(courseId), listCategories()])
-      .then(([courseDetail, categoryList]) => {
+    Promise.all([getOwnerCourse(courseId), listOwnerCatalogOptions()])
+      .then(([courseDetail, catalog]) => {
         if (cancelled) return;
         setCourse(courseDetail);
-        setCategories(categoryList);
+        setCategories(catalog.categories);
+        setLevels(catalog.levels);
         setLoadState('ready');
       })
       .catch((error: unknown) => {
@@ -410,6 +410,7 @@ export default function CourseEditorPage() {
                   key={`${course.id}:${course.version}:${course.updatedAt}`}
                   course={course}
                   categories={categories}
+                  levels={levels}
                   onSaved={setCourse}
                 />
               </TabsContent>
@@ -643,10 +644,11 @@ function EditorSkeleton() {
 interface MetadataTabProps {
   course: OwnerCourseDetailDto;
   categories: CategoryDto[];
+  levels: { id: string; name: string }[];
   onSaved: (course: OwnerCourseDetailDto) => void;
 }
 
-function MetadataTab({ course, categories, onSaved }: MetadataTabProps) {
+function MetadataTab({ course, categories, levels, onSaved }: MetadataTabProps) {
   const [title, setTitle] = useState(course.title);
   const [shortDescription, setShortDescription] = useState(course.shortDescription);
   const [description, setDescription] = useState(course.description);
@@ -774,9 +776,9 @@ function MetadataTab({ course, categories, onSaved }: MetadataTabProps) {
                 <SelectValue placeholder="Select level" />
               </SelectTrigger>
               <SelectContent>
-                {LEVEL_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {formatLevel(option)}
+                {levels.map((option) => (
+                  <SelectItem key={option.id} value={option.name}>
+                    {formatLevel(option.name)}
                   </SelectItem>
                 ))}
               </SelectContent>

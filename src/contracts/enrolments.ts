@@ -12,11 +12,7 @@ export const ENROLMENT_STATUSES = ["ACTIVE", "COMPLETED", "REVOKED"] as const;
 export const ENROLMENT_SOURCES = ["FREE", "PURCHASE", "ADMIN"] as const;
 /** Status filters accepted by the my-learning list endpoint. */
 export const ENROLMENT_STATUS_FILTERS = ["ACTIVE", "COMPLETED"] as const;
-/**
- * Client-safe course-level tuple: mirrors the Prisma enum without importing
- * server-only generated types into client bundles.
- */
-export const COURSE_LEVELS_FOR_ENROLMENT = ["BEGINNER", "INTERMEDIATE", "ADVANCED"] as const;
+/** Course levels are managed by the platform owner. */
 
 export type EnrolmentStatusValue = (typeof ENROLMENT_STATUSES)[number];
 export type EnrolmentSourceValue = (typeof ENROLMENT_SOURCES)[number];
@@ -54,7 +50,7 @@ export const enrolledCourseSummarySchema = z.object({
   slug: z.string(),
   title: z.string(),
   shortDescription: z.string(),
-  level: z.enum(COURSE_LEVELS_FOR_ENROLMENT),
+  level: z.string().trim().min(1).max(80),
   language: z.string(),
   thumbnailUrl: z.string().nullable(),
   totalLessons: z.number().int(),
