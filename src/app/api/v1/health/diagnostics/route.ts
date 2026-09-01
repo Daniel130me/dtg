@@ -38,7 +38,13 @@ export async function GET(request: Request) {
       database,
       providers: {
         smtpConfigured: Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD && env.EMAIL_FROM),
-        r2Configured: Boolean(env.R2_BUCKET && env.R2_ENDPOINT && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY),
+        r2Configured: Boolean(
+          env.R2_BUCKET &&
+            env.R2_S3_ENDPOINT &&
+            (env.R2_PUBLIC_BASE_URL ?? env.R2_ENDPOINT) &&
+            env.R2_ACCESS_KEY_ID &&
+            env.R2_SECRET_ACCESS_KEY,
+        ),
         paymentsConfigured: getConfiguredPaymentProvider() !== null,
       },
       queues: {

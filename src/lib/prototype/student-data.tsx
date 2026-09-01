@@ -32,47 +32,57 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
 
   // Load from localStorage when user/auth state changes
   useEffect(() => {
-    if (!isAuthenticated) {
-      setEnrolments([]);
-      setCertificates([]);
-      setNotifications([]);
-      return;
-    }
-
-    try {
-      const storedEnrolments = localStorage.getItem(getStorageKey(userKey, 'enrolments'));
-      const storedCertificates = localStorage.getItem(getStorageKey(userKey, 'certificates'));
-      const storedNotifications = localStorage.getItem(getStorageKey(userKey, 'notifications'));
-
-      if (storedEnrolments) {
-        setEnrolments(JSON.parse(storedEnrolments));
-      } else {
+    let cancelled = false;
+    // localStorage is an external system. Defer its snapshot application so
+    // the effect subscribes without causing a synchronous render cascade.
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (!isAuthenticated) {
         setEnrolments([]);
-      }
-
-      if (storedCertificates) {
-        setCertificates(JSON.parse(storedCertificates));
-      } else {
         setCertificates([]);
+        setNotifications([]);
+        return;
       }
 
-      if (storedNotifications) {
-        setNotifications(JSON.parse(storedNotifications));
-      } else {
-        const welcomeNotif: Notification = {
-          id: `notif-welcome-${Date.now()}`,
-          title: 'Welcome to DTG! 👋',
-          message: `Hello ${user?.name || userName || 'there'}! Welcome to your learning portal. Explore our course catalog to get started.`,
-          type: 'announcement',
-          createdAt: 'Just now',
-          isRead: false,
-        };
-        setNotifications([welcomeNotif]);
-        localStorage.setItem(getStorageKey(userKey, 'notifications'), JSON.stringify([welcomeNotif]));
+      try {
+        const storedEnrolments = localStorage.getItem(getStorageKey(userKey, 'enrolments'));
+        const storedCertificates = localStorage.getItem(getStorageKey(userKey, 'certificates'));
+        const storedNotifications = localStorage.getItem(getStorageKey(userKey, 'notifications'));
+
+        if (storedEnrolments) {
+          setEnrolments(JSON.parse(storedEnrolments));
+        } else {
+          setEnrolments([]);
+        }
+
+        if (storedCertificates) {
+          setCertificates(JSON.parse(storedCertificates));
+        } else {
+          setCertificates([]);
+        }
+
+        if (storedNotifications) {
+          setNotifications(JSON.parse(storedNotifications));
+        } else {
+          const welcomeNotif: Notification = {
+            id: `notif-welcome-${Date.now()}`,
+            title: 'Welcome to DTG! 👋',
+            message: `Hello ${user?.name || userName || 'there'}! Welcome to your learning portal. Explore our course catalog to get started.`,
+            type: 'announcement',
+            createdAt: 'Just now',
+            isRead: false,
+          };
+          setNotifications([welcomeNotif]);
+          localStorage.setItem(getStorageKey(userKey, 'notifications'), JSON.stringify([welcomeNotif]));
+        }
+      } catch {
+        // Ignore localStorage errors
       }
-    } catch {
-      // Ignore localStorage errors
-    }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [userKey, isAuthenticated, user?.name, userName]);
 
   const enrollInCourse = useCallback((courseId: string) => {

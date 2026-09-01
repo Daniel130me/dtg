@@ -56,12 +56,16 @@ server.log
 
 # sandbox artifacts
 tool-results/
-upload/
+/upload/
 .dbdata
 
 # sandbox postgres (portable binaries + data)
 .pg/
 .zscripts/dev.pid
+
+# Local codebase graph artifacts
+/graphify-out/
+/src/graphify-out/
 
 # Local embedded Postgres runtime (sandbox-only, never commit)
 .local-postgres/

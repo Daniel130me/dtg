@@ -187,6 +187,8 @@ interface SectionRow {
 
 export interface CourseDetailRow extends CourseSummaryRow {
   description: string;
+  thumbnailUrl: string | null;
+  promoVideoUrl: string | null;
   sections: SectionRow[];
   requirements: Array<{ id: string; position: number; text: string }>;
   outcomes: Array<{ id: string; position: number; text: string }>;
@@ -249,6 +251,8 @@ export function toOwnerCourseDetailDto(row: CourseDetailRow): OwnerCourseDetailD
   return {
     ...toOwnerCourseListItemDto(row),
     description: row.description,
+    thumbnailUrl: row.thumbnailUrl,
+    promoVideoUrl: row.promoVideoUrl,
     sections: row.sections.map(toOwnerSectionDto),
     requirements: row.requirements.map((requirement) => ({ ...requirement })),
     outcomes: row.outcomes.map((outcome) => ({ ...outcome })),

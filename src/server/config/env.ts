@@ -40,6 +40,11 @@ const serverEnvSchema = z
     RATE_LIMIT_SALT: z.string().min(16).default("development-only-rate-limit-salt"),
     BETTER_AUTH_SECRET: z.string().min(32).default("development-only-auth-secret-change-me"),
     R2_BUCKET: optionalString,
+    // R2's S3 API endpoint and public delivery URL serve different purposes.
+    // Presigned requests only work with the r2.cloudflarestorage.com endpoint.
+    R2_S3_ENDPOINT: optionalUrl,
+    R2_PUBLIC_BASE_URL: optionalUrl,
+    // Deprecated compatibility alias for the public Worker/custom-domain URL.
     R2_ENDPOINT: optionalUrl,
     R2_ACCESS_KEY_ID: optionalString,
     R2_SECRET_ACCESS_KEY: optionalString,
@@ -94,6 +99,20 @@ const serverEnvSchema = z
         code: "custom",
         path: ["FLUTTERWAVE_SECRET_KEY"],
         message: "FLUTTERWAVE_SECRET_KEY and FLUTTERWAVE_WEBHOOK_HASH must be configured together",
+      });
+    }
+
+    // Media remains a degradable capability: incomplete R2 configuration must
+    // not prevent authentication, catalog, or learning routes from starting.
+    if (
+      value.R2_S3_ENDPOINT &&
+      new URL(value.R2_S3_ENDPOINT).hostname !== "r2.cloudflarestorage.com" &&
+      !new URL(value.R2_S3_ENDPOINT).hostname.endsWith(".r2.cloudflarestorage.com")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["R2_S3_ENDPOINT"],
+        message: "must be the Cloudflare R2 S3 API endpoint",
       });
     }
   });

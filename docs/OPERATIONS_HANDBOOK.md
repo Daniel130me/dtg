@@ -113,9 +113,25 @@ Validation is centralized in `src/server/config/env.ts` (Zod). The process
 | Database | `DATABASE_URL` (must be `postgresql://`), `DIRECT_URL`, `TEST_DATABASE_URL` | `DATABASE_URL` is **required** |
 | HTTP security | `CORS_ORIGINS` (comma list), `TRUST_PROXY_HEADERS`, `RATE_LIMIT_SALT`, `BETTER_AUTH_SECRET` | Salt/secret must not match `/development\|replace\|example/i` in production — boot fails |
 | Observability | `RELEASE_ID` (falls back to package version), `METRICS_ENABLED` (default true; gates `/metrics` endpoint, collection stays on) | |
-| R2 | `R2_BUCKET`, `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Optional; media features degrade until configured |
+| R2 | `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_PUBLIC_BASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Optional; media features degrade until configured. `R2_S3_ENDPOINT` must use `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`; the public Worker/custom domain belongs in `R2_PUBLIC_BASE_URL`. |
 | SMTP | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | All-or-nothing: partial config fails boot; absent config = logged mail delivery |
 | Flutterwave | `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_WEBHOOK_HASH` | All-or-nothing: partial config fails boot (prevents paid checkout without verifiable webhooks) |
+
+Browser-to-R2 thumbnail uploads also require a bucket CORS policy. Allow only
+the deployed application origins, the `PUT` method, and the `Content-Type`
+header; expose `ETag` and keep the preflight cache bounded. Example:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-app.example"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
 
 Set `TRUST_PROXY_HEADERS=true` **only** behind a proxy that actually sets
 `X-Forwarded-For`/`X-Forwarded-Proto`, otherwise rate limiting and origin

@@ -6,6 +6,9 @@ import {
   courseLevelSchema,
   courseStatusSchema,
   lessonTypeSchema,
+  MAX_COURSE_LESSONS,
+  MAX_COURSE_SECTIONS,
+  MAX_LESSONS_PER_SECTION,
 } from "@/contracts/owner-courses";
 
 // Field bounds mirror the column limits in prisma/schema.prisma.
@@ -29,28 +32,64 @@ export const LESSON_CONTENT_MAX_LENGTH = 20_000;
 export const MIN_POSITION = 1;
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const httpUrlSchema = z
+  .url()
+  .max(2048)
+  .refine((value) => ["https:", "http:"].includes(new URL(value).protocol), {
+    message: "URL must use HTTP or HTTPS.",
+  });
 
-export const createCourseSchema = z.object({
-  title: z.string().trim().min(COURSE_TITLE_MIN_LENGTH).max(COURSE_TITLE_MAX_LENGTH),
-  shortDescription: z
-    .string()
-    .trim()
-    .min(SHORT_DESCRIPTION_MIN_LENGTH)
-    .max(SHORT_DESCRIPTION_MAX_LENGTH),
-  description: z.string().trim().min(DESCRIPTION_MIN_LENGTH).max(DESCRIPTION_MAX_LENGTH),
-  categoryId: z.uuid(),
-  level: courseLevelSchema,
-  language: z.string().trim().min(1).max(LANGUAGE_MAX_LENGTH).default("English"),
-  priceMinor: z.number().int().min(0).max(PRICE_MINOR_MAX).default(0),
-  // Optional: generated from the title when absent. Immutable after creation.
-  slug: z
-    .string()
-    .trim()
-    .min(1)
-    .max(SLUG_MAX_LENGTH)
-    .regex(SLUG_PATTERN, "Slug may only contain lowercase letters, numbers, and dashes.")
-    .optional(),
+const courseDraftLessonSchema = z.object({
+  title: z.string().trim().min(LESSON_TITLE_MIN_LENGTH).max(LESSON_TITLE_MAX_LENGTH),
+  type: lessonTypeSchema,
+  durationSeconds: z.number().int().min(0).max(LESSON_DURATION_MAX_SECONDS).default(0),
+  isPreview: z.boolean().default(false),
+  content: z.string().max(LESSON_CONTENT_MAX_LENGTH).optional(),
+  videoUrl: httpUrlSchema.optional(),
 });
+
+const courseDraftSectionSchema = z.object({
+  title: z.string().trim().min(SECTION_TITLE_MIN_LENGTH).max(SECTION_TITLE_MAX_LENGTH),
+  lessons: z.array(courseDraftLessonSchema).max(MAX_LESSONS_PER_SECTION).default([]),
+});
+
+export const createCourseSchema = z
+  .object({
+    title: z.string().trim().min(COURSE_TITLE_MIN_LENGTH).max(COURSE_TITLE_MAX_LENGTH),
+    shortDescription: z
+      .string()
+      .trim()
+      .min(SHORT_DESCRIPTION_MIN_LENGTH)
+      .max(SHORT_DESCRIPTION_MAX_LENGTH),
+    description: z.string().trim().min(DESCRIPTION_MIN_LENGTH).max(DESCRIPTION_MAX_LENGTH),
+    categoryId: z.uuid(),
+    level: courseLevelSchema,
+    language: z.string().trim().min(1).max(LANGUAGE_MAX_LENGTH).default("English"),
+    priceMinor: z.number().int().min(0).max(PRICE_MINOR_MAX).default(0),
+    promoVideoUrl: httpUrlSchema.optional(),
+    curriculum: z.array(courseDraftSectionSchema).max(MAX_COURSE_SECTIONS).default([]),
+    // Optional: generated from the title when absent. Immutable after creation.
+    slug: z
+      .string()
+      .trim()
+      .min(1)
+      .max(SLUG_MAX_LENGTH)
+      .regex(SLUG_PATTERN, "Slug may only contain lowercase letters, numbers, and dashes.")
+      .optional(),
+  })
+  .superRefine((value, context) => {
+    const lessonCount = value.curriculum.reduce(
+      (total, section) => total + section.lessons.length,
+      0,
+    );
+    if (lessonCount > MAX_COURSE_LESSONS) {
+      context.addIssue({
+        code: "custom",
+        path: ["curriculum"],
+        message: `A course may contain at most ${MAX_COURSE_LESSONS} lessons.`,
+      });
+    }
+  });
 
 // The slug is deliberately excluded: it forms the public course URL, so it is
 // immutable after creation to keep external links and bookmarks stable.
@@ -68,6 +107,7 @@ export const updateCourseSchema = z
     level: courseLevelSchema.optional(),
     language: z.string().trim().min(1).max(LANGUAGE_MAX_LENGTH).optional(),
     priceMinor: z.number().int().min(0).max(PRICE_MINOR_MAX).optional(),
+    promoVideoUrl: httpUrlSchema.nullable().optional(),
     // Optimistic concurrency: compared against the stored course version.
     expectedVersion: z.number().int().min(1).optional(),
   })
@@ -94,14 +134,7 @@ export const sectionUpdateSchema = z
     message: "At least one field must be provided.",
   });
 
-export const lessonCreateSchema = z.object({
-  title: z.string().trim().min(LESSON_TITLE_MIN_LENGTH).max(LESSON_TITLE_MAX_LENGTH),
-  type: lessonTypeSchema,
-  durationSeconds: z.number().int().min(0).max(LESSON_DURATION_MAX_SECONDS).default(0),
-  isPreview: z.boolean().default(false),
-  content: z.string().max(LESSON_CONTENT_MAX_LENGTH).optional(),
-  videoUrl: z.url().max(2048).optional(),
-});
+export const lessonCreateSchema = courseDraftLessonSchema;
 
 export const lessonUpdateSchema = z
   .object({
@@ -111,7 +144,7 @@ export const lessonUpdateSchema = z
     isPreview: z.boolean().optional(),
     // Nullable so the owner can clear stored content/media.
     content: z.string().max(LESSON_CONTENT_MAX_LENGTH).nullable().optional(),
-    videoUrl: z.url().max(2048).nullable().optional(),
+    videoUrl: httpUrlSchema.nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field must be provided.",

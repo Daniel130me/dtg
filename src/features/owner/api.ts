@@ -2,6 +2,11 @@ import { apiRequest } from "@/lib/client/api-client";
 import type { CursorPage } from "@/contracts/api";
 import type { CategoryDto } from "@/contracts/catalog";
 import type {
+  CourseThumbnailResult,
+  ThumbnailUploadTicket,
+} from "@/contracts/course-media";
+import { ApiClientError } from "@/lib/client/api-client";
+import type {
   CreateCourseBody,
   LessonCreateBody,
   LessonUpdateBody,
@@ -110,6 +115,53 @@ export async function unpublishCourse(courseId: string): Promise<OwnerCourseLife
     { method: "POST" },
   );
   return course;
+}
+
+// -------------------------------------------------------------------------
+// Course media
+// -------------------------------------------------------------------------
+
+export async function uploadCourseThumbnail(
+  courseId: string,
+  file: File,
+): Promise<CourseThumbnailResult> {
+  const { upload } = await apiRequest<{ upload: ThumbnailUploadTicket }>(
+    `${OWNER_API_BASE}/courses/${courseId}/thumbnail/upload`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type,
+        sizeBytes: file.size,
+      }),
+    },
+  );
+
+  const uploadResponse = await fetch(upload.uploadUrl, {
+    method: "PUT",
+    headers: { "content-type": file.type },
+    body: file,
+  });
+  if (!uploadResponse.ok) {
+    throw new ApiClientError(
+      uploadResponse.status,
+      "MEDIA_UPLOAD_FAILED",
+      "The thumbnail could not be uploaded to media storage.",
+    );
+  }
+
+  const { thumbnail } = await apiRequest<{ thumbnail: CourseThumbnailResult }>(
+    `${OWNER_API_BASE}/courses/${courseId}/thumbnail/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        objectKey: upload.objectKey,
+        expectedSizeBytes: file.size,
+        expectedContentType: file.type,
+      }),
+    },
+  );
+  return thumbnail;
 }
 
 // -------------------------------------------------------------------------

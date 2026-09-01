@@ -439,8 +439,25 @@ export default function CourseDetailPage() {
           {/* Sidebar Card */}
           <div>
             <Card className='sticky top-20 p-0 overflow-hidden gap-0'>
-              <div className={`h-40 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
-                {categoryIconMap[iconKey] ?? <BookOpen className='size-20 text-white/70' />}
+              <div
+                className={`h-40 bg-gradient-to-br ${gradient} flex items-center justify-center relative bg-cover bg-center`}
+                style={course.thumbnailUrl ? { backgroundImage: `url("${course.thumbnailUrl}")` } : undefined}
+              >
+                {!course.thumbnailUrl &&
+                  (categoryIconMap[iconKey] ?? <BookOpen className='size-20 text-white/70' />)}
+                {course.promoVideoUrl && (
+                  <a
+                    href={course.promoVideoUrl}
+                    target='_blank'
+                    rel='noreferrer'
+                    className='absolute inset-0 flex items-center justify-center bg-black/25 transition-colors hover:bg-black/35'
+                    aria-label='Watch course preview video'
+                  >
+                    <span className='flex size-14 items-center justify-center rounded-full bg-white/95 text-primary shadow-lg'>
+                      <PlayCircle className='size-7' />
+                    </span>
+                  </a>
+                )}
               </div>
               <CardContent className='p-6'>
                 <div className='text-3xl font-bold mb-1'>

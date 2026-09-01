@@ -170,10 +170,44 @@ describe("owner course schemas", () => {
     assert.equal(parsed.language, "English");
     assert.equal(parsed.priceMinor, 0);
     assert.equal(parsed.slug, undefined);
+    assert.deepEqual(parsed.curriculum, []);
 
     const lesson = lessonCreateSchema.parse({ title: "Welcome", type: "VIDEO" });
     assert.equal(lesson.durationSeconds, 0);
     assert.equal(lesson.isPreview, false);
+  });
+
+  it("validates and defaults an initial curriculum atomically", () => {
+    const parsed = createCourseSchema.parse({
+      ...validCreate,
+      promoVideoUrl: "https://video.example.test/preview",
+      curriculum: [
+        {
+          title: "Getting started",
+          lessons: [{ title: "Welcome aboard", type: "VIDEO" }],
+        },
+      ],
+    });
+
+    assert.equal(parsed.curriculum[0].lessons[0].durationSeconds, 0);
+    assert.equal(parsed.curriculum[0].lessons[0].isPreview, false);
+    assert.equal(parsed.promoVideoUrl, "https://video.example.test/preview");
+  });
+
+  it("rejects invalid nested curriculum and promo links", () => {
+    assert.throws(() =>
+      createCourseSchema.parse({
+        ...validCreate,
+        promoVideoUrl: "not-a-url",
+        curriculum: [{ title: "x", lessons: [{ title: "y", type: "VIDEO" }] }],
+      }),
+    );
+    assert.throws(() =>
+      createCourseSchema.parse({
+        ...validCreate,
+        promoVideoUrl: "javascript:alert(1)",
+      }),
+    );
   });
 
   it("enforces field bounds", () => {

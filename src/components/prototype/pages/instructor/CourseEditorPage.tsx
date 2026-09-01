@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -16,6 +16,8 @@ import {
   FileText,
   HelpCircle,
   Layers,
+  ImageIcon,
+  Link as LinkIcon,
   Loader2,
   MoveRight,
   Pencil,
@@ -24,6 +26,7 @@ import {
   Rocket,
   Trash2,
   Undo2,
+  Upload,
   Video,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -79,6 +82,7 @@ import {
   unpublishCourse,
   updateCourse,
   updateLesson,
+  uploadCourseThumbnail,
 } from '@/features/owner/api';
 import {
   COURSE_STATUS_BADGE_CLASS,
@@ -106,6 +110,10 @@ import type {
   OwnerSectionDto,
 } from '@/contracts/owner-courses';
 import type { CategoryDto } from '@/contracts/catalog';
+import {
+  COURSE_THUMBNAIL_CONTENT_TYPES,
+  MAX_COURSE_THUMBNAIL_BYTES,
+} from '@/contracts/course-media';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
 
@@ -177,6 +185,7 @@ function formatCourseContentLength(totalMinutes: number): string {
 
 export default function CourseEditorPage() {
   const params = useParams<{ courseId: string }>();
+  const searchParams = useSearchParams();
   const courseId = params.courseId;
 
   const [course, setCourse] = useState<OwnerCourseDetailDto | null>(null);
@@ -186,7 +195,9 @@ export default function CourseEditorPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [lifecycleBusy, setLifecycleBusy] = useState<LifecycleAction | null>(null);
   const [confirmAction, setConfirmAction] = useState<LifecycleAction | null>(null);
-  const [activeTab, setActiveTab] = useState<'metadata' | 'curriculum'>('metadata');
+  const [activeTab, setActiveTab] = useState<'metadata' | 'media' | 'curriculum'>(() =>
+    searchParams.get('tab') === 'curriculum' ? 'curriculum' : 'metadata',
+  );
 
   // Initial load: state is set from the async callbacks only, never
   // synchronously inside the effect (react-hooks/set-state-in-effect).
@@ -375,10 +386,13 @@ export default function CourseEditorPage() {
           <motion.div variants={item}>
             <Tabs
               value={activeTab}
-              onValueChange={(value) => setActiveTab(value as 'metadata' | 'curriculum')}
+              onValueChange={(value) =>
+                setActiveTab(value as 'metadata' | 'media' | 'curriculum')
+              }
             >
               <TabsList>
                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                <TabsTrigger value="media">Media</TabsTrigger>
                 <TabsTrigger value="curriculum">
                   Curriculum
                   <Badge variant="secondary" className="ml-2 text-xs">
@@ -393,6 +407,9 @@ export default function CourseEditorPage() {
                   categories={categories}
                   onSaved={setCourse}
                 />
+              </TabsContent>
+              <TabsContent value="media" className="mt-4">
+                <MediaTab course={course} onSaved={setCourse} />
               </TabsContent>
               <TabsContent value="curriculum" className="mt-4">
                 <CurriculumTab course={course} onRefetch={refetch} />
@@ -443,6 +460,148 @@ export default function CourseEditorPage() {
         </AlertDialogContent>
       </AlertDialog>
     </InstructorLayout>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Media tab
+// ---------------------------------------------------------------------------
+
+interface MediaTabProps {
+  course: OwnerCourseDetailDto;
+  onSaved: (course: OwnerCourseDetailDto) => void;
+}
+
+function MediaTab({ course, onSaved }: MediaTabProps) {
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [promoVideoUrl, setPromoVideoUrl] = useState(course.promoVideoUrl ?? '');
+  const [uploading, setUploading] = useState(false);
+  const [savingPromo, setSavingPromo] = useState(false);
+
+  const handleThumbnailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+    if (!(COURSE_THUMBNAIL_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      toast.error('Choose a PNG, JPG, or WebP thumbnail.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_COURSE_THUMBNAIL_BYTES) {
+      toast.error('The thumbnail must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+    setThumbnailFile(file);
+  };
+
+  const handleThumbnailUpload = async () => {
+    if (!thumbnailFile) return;
+    setUploading(true);
+    try {
+      await uploadCourseThumbnail(course.id, thumbnailFile);
+      const updated = await getOwnerCourse(course.id);
+      onSaved(updated);
+      setThumbnailFile(null);
+      toast.success('Course thumbnail uploaded.');
+    } catch (error) {
+      showActionErrorToast(error, 'The course thumbnail could not be uploaded.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePromoSave = async () => {
+    const parsed = updateCourseSchema.safeParse({
+      promoVideoUrl: promoVideoUrl.trim() || null,
+      expectedVersion: course.version,
+    });
+    if (!parsed.success) {
+      showValidationIssuesToast(parsed.error, 'Enter a valid promo-video URL.');
+      return;
+    }
+
+    setSavingPromo(true);
+    try {
+      const updated = await updateCourse(course.id, parsed.data);
+      onSaved(updated);
+      toast.success('Promo video saved.');
+    } catch (error) {
+      showActionErrorToast(error, 'The promo video could not be saved.');
+    } finally {
+      setSavingPromo(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Course media</CardTitle>
+        <CardDescription>
+          Manage the catalog thumbnail and the optional public promo-video link.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <Label htmlFor="editor-thumbnail">Course thumbnail</Label>
+          <label
+            htmlFor="editor-thumbnail"
+            className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-muted/30 p-8 text-center transition-colors hover:border-primary/50"
+          >
+            {course.thumbnailUrl ? (
+              <ImageIcon className="mb-3 size-6 text-primary" />
+            ) : (
+              <Upload className="mb-3 size-6 text-muted-foreground" />
+            )}
+            <span className="max-w-full truncate text-sm font-medium">
+              {thumbnailFile?.name ??
+                (course.thumbnailUrl ? 'Choose a replacement thumbnail' : 'Choose a thumbnail')}
+            </span>
+            <span className="mt-1 text-xs text-muted-foreground">
+              PNG, JPG or WebP · max 5 MB · recommended 1280×720
+            </span>
+          </label>
+          <Input
+            id="editor-thumbnail"
+            type="file"
+            accept={COURSE_THUMBNAIL_CONTENT_TYPES.join(',')}
+            onChange={handleThumbnailChange}
+            className="sr-only"
+          />
+          <Button
+            type="button"
+            onClick={() => void handleThumbnailUpload()}
+            disabled={!thumbnailFile || uploading}
+          >
+            {uploading && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Upload thumbnail
+          </Button>
+        </div>
+
+        <div className="space-y-3 border-t pt-5">
+          <Label htmlFor="editor-promo-video">Promo video URL</Label>
+          <div className="relative">
+            <LinkIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="editor-promo-video"
+              type="url"
+              className="pl-9"
+              placeholder="https://youtube.com/watch?v=..."
+              value={promoVideoUrl}
+              onChange={(event) => setPromoVideoUrl(event.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handlePromoSave()}
+            disabled={savingPromo}
+          >
+            {savingPromo && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Save promo video
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

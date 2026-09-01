@@ -88,6 +88,7 @@ const courseDetailSelect = {
   ...courseListSelect,
   status: true,
   description: true,
+  promoVideoUrl: true,
   requirements: { orderBy: { position: "asc" }, select: { text: true } },
   outcomes: { orderBy: { position: "asc" }, select: { text: true } },
   sections: {
@@ -298,6 +299,7 @@ function toCourseDetailDto(row: CourseDetailRow): CourseDetailDto {
   return {
     ...toCourseListItemDto(row),
     description: row.description,
+    promoVideoUrl: row.promoVideoUrl,
     requirements: row.requirements.map((requirement) => requirement.text),
     outcomes: row.outcomes.map((outcome) => outcome.text),
     sections: row.sections.map((section) => ({

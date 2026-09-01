@@ -11,6 +11,8 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  Trash2,
+  Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import InstructorLayout from './InstructorLayout';
-import { createCourse, listCategories } from '@/features/owner/api';
+import { createCourse, listCategories, uploadCourseThumbnail } from '@/features/owner/api';
 import {
   showActionErrorToast,
   showValidationIssuesToast,
@@ -37,9 +39,14 @@ import {
 import {
   createCourseSchema,
   COURSE_LEVELS,
+  LESSON_TYPES,
 } from '@/contracts/owner-courses';
-import type { CourseLevelValue } from '@/contracts/owner-courses';
+import type { CourseLevelValue, LessonTypeValue } from '@/contracts/owner-courses';
 import type { CategoryDto } from '@/contracts/catalog';
+import {
+  COURSE_THUMBNAIL_CONTENT_TYPES,
+  MAX_COURSE_THUMBNAIL_BYTES,
+} from '@/contracts/course-media';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatLevel } from '@/lib/client/format';
 
@@ -65,6 +72,34 @@ function parsePriceToMinor(raw: string): number | null {
   return Math.round(value * 100);
 }
 
+interface DraftLesson {
+  clientId: string;
+  title: string;
+  type: LessonTypeValue;
+  durationMinutes: string;
+  isPreview: boolean;
+  content: string;
+  videoUrl: string;
+}
+
+interface DraftSection {
+  clientId: string;
+  title: string;
+  lessons: DraftLesson[];
+}
+
+function createDraftLesson(): DraftLesson {
+  return {
+    clientId: crypto.randomUUID(),
+    title: '',
+    type: 'VIDEO',
+    durationMinutes: '0',
+    isPreview: false,
+    content: '',
+    videoUrl: '',
+  };
+}
+
 export default function CreateCoursePage() {
   const router = useRouter();
 
@@ -80,6 +115,9 @@ export default function CreateCoursePage() {
   const [language, setLanguage] = useState('English');
   const [priceInput, setPriceInput] = useState('0');
   const [isFree, setIsFree] = useState(true);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [promoVideoUrl, setPromoVideoUrl] = useState('');
+  const [curriculum, setCurriculum] = useState<DraftSection[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // Categories load: state updates only from the async callbacks, never
@@ -110,6 +148,86 @@ export default function CreateCoursePage() {
 
   const effectivePriceMinor = isFree ? 0 : parsePriceToMinor(priceInput);
 
+  const handleThumbnailChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setThumbnailFile(null);
+      return;
+    }
+    if (!(COURSE_THUMBNAIL_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      toast.error('Choose a PNG, JPG, or WebP thumbnail.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_COURSE_THUMBNAIL_BYTES) {
+      toast.error('The thumbnail must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+    setThumbnailFile(file);
+  };
+
+  const addSection = () => {
+    setCurriculum((sections) => [
+      ...sections,
+      { clientId: crypto.randomUUID(), title: '', lessons: [] },
+    ]);
+  };
+
+  const updateSectionTitle = (sectionId: string, value: string) => {
+    setCurriculum((sections) =>
+      sections.map((section) =>
+        section.clientId === sectionId ? { ...section, title: value } : section,
+      ),
+    );
+  };
+
+  const removeSection = (sectionId: string) => {
+    setCurriculum((sections) => sections.filter((section) => section.clientId !== sectionId));
+  };
+
+  const addLesson = (sectionId: string) => {
+    setCurriculum((sections) =>
+      sections.map((section) =>
+        section.clientId === sectionId
+          ? { ...section, lessons: [...section.lessons, createDraftLesson()] }
+          : section,
+      ),
+    );
+  };
+
+  const updateLesson = (
+    sectionId: string,
+    lessonId: string,
+    fields: Partial<Omit<DraftLesson, 'clientId'>>,
+  ) => {
+    setCurriculum((sections) =>
+      sections.map((section) =>
+        section.clientId === sectionId
+          ? {
+              ...section,
+              lessons: section.lessons.map((lesson) =>
+                lesson.clientId === lessonId ? { ...lesson, ...fields } : lesson,
+              ),
+            }
+          : section,
+      ),
+    );
+  };
+
+  const removeLesson = (sectionId: string, lessonId: string) => {
+    setCurriculum((sections) =>
+      sections.map((section) =>
+        section.clientId === sectionId
+          ? {
+              ...section,
+              lessons: section.lessons.filter((lesson) => lesson.clientId !== lessonId),
+            }
+          : section,
+      ),
+    );
+  };
+
   const handleSubmit = async () => {
     if (effectivePriceMinor === null) {
       toast.error('Please enter a valid price (a non-negative number).');
@@ -124,6 +242,22 @@ export default function CreateCoursePage() {
       level,
       language,
       priceMinor: effectivePriceMinor,
+      ...(promoVideoUrl.trim() ? { promoVideoUrl: promoVideoUrl.trim() } : {}),
+      curriculum: curriculum.map((section) => ({
+        title: section.title,
+        lessons: section.lessons.map((lesson) => ({
+          title: lesson.title,
+          type: lesson.type,
+          durationSeconds: Math.round((Number(lesson.durationMinutes) || 0) * 60),
+          isPreview: lesson.isPreview,
+          ...(lesson.type === 'TEXT' && lesson.content.trim()
+            ? { content: lesson.content.trim() }
+            : {}),
+          ...(lesson.type === 'VIDEO' && lesson.videoUrl.trim()
+            ? { videoUrl: lesson.videoUrl.trim() }
+            : {}),
+        })),
+      })),
     };
 
     const parsed = createCourseSchema.safeParse(body);
@@ -135,10 +269,24 @@ export default function CreateCoursePage() {
     setSubmitting(true);
     try {
       const course = await createCourse(parsed.data);
+      let thumbnailUploaded = false;
+      if (thumbnailFile) {
+        try {
+          await uploadCourseThumbnail(course.id, thumbnailFile);
+          thumbnailUploaded = true;
+        } catch (error) {
+          showActionErrorToast(
+            error,
+            'The course was created, but its thumbnail could not be uploaded.',
+          );
+        }
+      }
       toast.success(`"${course.title}" has been created.`, {
-        description: 'Add sections and lessons next — publishing happens in the editor.',
+        description: `${course.totalSections} section(s) and ${course.totalLessons} lesson(s) saved${
+          thumbnailFile ? (thumbnailUploaded ? '; thumbnail uploaded.' : '; thumbnail needs retry.') : '.'
+        }`,
       });
-      router.push(`/owner/courses/${course.id}`);
+      router.push(`/owner/courses/${course.id}?tab=curriculum`);
     } catch (error) {
       showActionErrorToast(error, 'The course could not be created.');
       setSubmitting(false);
@@ -255,30 +403,48 @@ export default function CreateCoursePage() {
             </Card>
           </motion.div>
 
-          {/* 2. Course Media (not backed by the authoring API yet) */}
+          {/* 2. Course Media */}
           <motion.div variants={item}>
-            <Card className="opacity-75">
+            <Card>
               <CardHeader>
                 <CardTitle className="text-base">2. Course Media</CardTitle>
                 <CardDescription>
-                  Thumbnail and promo video are not part of the authoring API yet — you will be
-                  able to add them later.
+                  Add a catalog thumbnail and an optional public promo-video link.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Course Thumbnail</Label>
-                  <div className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center bg-muted/30 cursor-not-allowed">
+                  <Label htmlFor="course-thumbnail">Course Thumbnail</Label>
+                  <label
+                    htmlFor="course-thumbnail"
+                    className="border-2 border-dashed rounded-xl p-8 flex cursor-pointer flex-col items-center justify-center bg-muted/30 transition-colors hover:border-primary/50 hover:bg-muted/50"
+                  >
                     <div className="p-3 rounded-full bg-muted mb-3">
-                      <ImageIcon className="size-6 text-muted-foreground" />
+                      {thumbnailFile ? (
+                        <ImageIcon className="size-6 text-primary" />
+                      ) : (
+                        <Upload className="size-6 text-muted-foreground" />
+                      )}
                     </div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Media uploads coming soon
+                    <p className="max-w-full truncate text-sm font-medium">
+                      {thumbnailFile?.name ?? 'Choose a course thumbnail'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG or WebP (recommended: 1280×720)
+                      PNG, JPG or WebP · max 5 MB · recommended 1280×720
                     </p>
-                  </div>
+                  </label>
+                  <Input
+                    id="course-thumbnail"
+                    type="file"
+                    accept={COURSE_THUMBNAIL_CONTENT_TYPES.join(',')}
+                    onChange={handleThumbnailChange}
+                    className="sr-only"
+                  />
+                  {thumbnailFile && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setThumbnailFile(null)}>
+                      Remove selected thumbnail
+                    </Button>
+                  )}
                 </div>
                 <Separator />
                 <div className="space-y-2">
@@ -287,9 +453,11 @@ export default function CreateCoursePage() {
                     <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                     <Input
                       id="promo-video"
-                      placeholder="Available after creation"
+                      type="url"
+                      placeholder="https://youtube.com/watch?v=..."
                       className="pl-9"
-                      disabled
+                      value={promoVideoUrl}
+                      onChange={(event) => setPromoVideoUrl(event.target.value)}
                     />
                   </div>
                 </div>
@@ -297,30 +465,161 @@ export default function CreateCoursePage() {
             </Card>
           </motion.div>
 
-          {/* 3. Curriculum (managed in the editor after creation) */}
+          {/* 3. Curriculum */}
           <motion.div variants={item}>
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">3. Curriculum</CardTitle>
                 <CardDescription>
-                  Sections and lessons are added in the course editor right after creation.
+                  Draft the initial sections and lessons. You can refine and reorder them later.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="border border-dashed rounded-xl p-8 flex flex-col items-center justify-center bg-muted/30 text-center">
-                  <div className="p-3 rounded-full bg-muted mb-3">
-                    <Layers className="size-6 text-muted-foreground" />
+              <CardContent className="space-y-4">
+                {curriculum.length === 0 ? (
+                  <div className="border border-dashed rounded-xl p-8 flex flex-col items-center justify-center bg-muted/30 text-center">
+                    <div className="p-3 rounded-full bg-muted mb-3">
+                      <Layers className="size-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">Start the curriculum</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                      Add at least one section and one lesson before publishing.
+                    </p>
                   </div>
-                  <p className="text-sm font-medium">Curriculum editor opens after creation</p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                    A course needs at least one section with one lesson before it can be published.
-                    You will be taken there automatically.
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-4 border-dashed" disabled>
-                    <Plus className="size-4 mr-2" />
-                    Add Section
-                  </Button>
-                </div>
+                ) : (
+                  curriculum.map((section, sectionIndex) => (
+                    <div key={section.clientId} className="space-y-3 rounded-xl border p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-muted-foreground">
+                          {sectionIndex + 1}
+                        </span>
+                        <Input
+                          aria-label={`Section ${sectionIndex + 1} title`}
+                          placeholder="Section title"
+                          value={section.title}
+                          onChange={(event) => updateSectionTitle(section.clientId, event.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remove section ${sectionIndex + 1}`}
+                          onClick={() => removeSection(section.clientId)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3 pl-0 sm:pl-7">
+                        {section.lessons.map((lesson, lessonIndex) => (
+                          <div key={lesson.clientId} className="space-y-3 rounded-lg bg-muted/40 p-3">
+                            <div className="grid gap-2 sm:grid-cols-[1fr_150px_90px_auto]">
+                              <Input
+                                aria-label={`Lesson ${lessonIndex + 1} title`}
+                                placeholder="Lesson title"
+                                value={lesson.title}
+                                onChange={(event) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    title: event.target.value,
+                                  })
+                                }
+                              />
+                              <Select
+                                value={lesson.type}
+                                onValueChange={(value) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    type: value as LessonTypeValue,
+                                  })
+                                }
+                              >
+                                <SelectTrigger aria-label={`Lesson ${lessonIndex + 1} type`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LESSON_TYPES.map((type) => (
+                                    <SelectItem key={type} value={type}>
+                                      {type.charAt(0) + type.slice(1).toLowerCase()}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                aria-label={`Lesson ${lessonIndex + 1} duration in minutes`}
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={lesson.durationMinutes}
+                                onChange={(event) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    durationMinutes: event.target.value,
+                                  })
+                                }
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Remove lesson ${lessonIndex + 1}`}
+                                onClick={() => removeLesson(section.clientId, lesson.clientId)}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </div>
+                            {lesson.type === 'VIDEO' && (
+                              <Input
+                                type="url"
+                                placeholder="Optional video URL"
+                                value={lesson.videoUrl}
+                                onChange={(event) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    videoUrl: event.target.value,
+                                  })
+                                }
+                              />
+                            )}
+                            {lesson.type === 'TEXT' && (
+                              <Textarea
+                                placeholder="Optional lesson content (Markdown supported)"
+                                value={lesson.content}
+                                onChange={(event) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    content: event.target.value,
+                                  })
+                                }
+                              />
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id={`preview-${lesson.clientId}`}
+                                checked={lesson.isPreview}
+                                onCheckedChange={(checked) =>
+                                  updateLesson(section.clientId, lesson.clientId, {
+                                    isPreview: checked === true,
+                                  })
+                                }
+                              />
+                              <Label htmlFor={`preview-${lesson.clientId}`} className="font-normal">
+                                Free preview lesson
+                              </Label>
+                            </div>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addLesson(section.clientId)}
+                        >
+                          <Plus className="size-4 mr-2" />
+                          Add lesson
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <Button type="button" variant="outline" onClick={addSection}>
+                  <Plus className="size-4 mr-2" />
+                  Add section
+                </Button>
               </CardContent>
             </Card>
           </motion.div>
@@ -385,8 +684,8 @@ export default function CreateCoursePage() {
                 <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
                   <AlertTriangle className="size-4 shrink-0 mt-0.5" />
                   <span>
-                    After creation you will land in the course editor to add sections and lessons —
-                    the Publish button lives there.
+                    The course, its curriculum, and media reference will be saved as a draft.
+                    Publishing remains a separate review action in the editor.
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">

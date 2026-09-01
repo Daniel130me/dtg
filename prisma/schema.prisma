@@ -305,6 +305,10 @@ model Course {
   shortDescription String       @db.VarChar(320)
   description      String       @db.VarChar(6000)
   thumbnailUrl     String?      @db.VarChar(2048)
+  // Provider-neutral object key is retained separately from the delivery URL
+  // so media can be migrated without changing the authoring contract.
+  thumbnailKey     String?      @db.VarChar(512)
+  promoVideoUrl    String?      @db.VarChar(2048)
   categoryId       String       @db.Uuid
   creatorUserId    String       @db.Uuid
   level            CourseLevel

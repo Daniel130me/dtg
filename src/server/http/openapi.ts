@@ -768,10 +768,43 @@ export const openApiDocument = {
         operationId: "createCourse",
         security: [{ sessionCookie: [] }],
         responses: {
-          "201": { description: "Course created as a draft." },
+          "201": { description: "Course created as a draft with its optional initial curriculum." },
           "401": { description: "Authentication is required." },
           "403": { description: "Owner access is required." },
           "422": { description: "Invalid course fields or inactive category." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/thumbnail/upload": {
+      post: {
+        operationId: "createCourseThumbnailUpload",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Short-lived, content-type-bound R2 PUT URL created." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "422": { description: "Unsupported file type or invalid file size." },
+          "503": { description: "Course media storage is not configured." },
+        },
+      },
+    },
+    "/owner/courses/{courseId}/thumbnail/complete": {
+      post: {
+        operationId: "completeCourseThumbnailUpload",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Uploaded object verified and attached to the course." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Course not found." },
+          "422": { description: "Object key, type, or size did not match the approved upload." },
         },
       },
     },

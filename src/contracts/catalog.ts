@@ -150,6 +150,7 @@ export type CourseInstructorDto = z.infer<typeof courseInstructorDtoSchema>;
 
 export const courseDetailDtoSchema = courseListItemDtoSchema.extend({
   description: z.string(),
+  promoVideoUrl: z.string().nullable(),
   requirements: z.array(z.string()),
   outcomes: z.array(z.string()),
   sections: z.array(courseSectionDtoSchema),

@@ -67,6 +67,11 @@ function CoursesPageContent() {
   const urlSort = parseEnumParam(COURSE_SORTS, searchParams.get('sort')) ?? DEFAULT_SORT;
 
   const [searchInput, setSearchInput] = useState(urlSearch);
+  const [lastUrlSearch, setLastUrlSearch] = useState(urlSearch);
+  if (lastUrlSearch !== urlSearch) {
+    setLastUrlSearch(urlSearch);
+    setSearchInput(urlSearch);
+  }
 
   const [items, setItems] = useState<CourseListItemDto[]>([]);
   const [total, setTotal] = useState(0);
@@ -116,11 +121,6 @@ function CoursesPageContent() {
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchInput, updateParams]);
-
-  // Keep the input in sync when the URL changes from elsewhere (nav links, back button).
-  useEffect(() => {
-    setSearchInput(urlSearch);
-  }, [urlSearch]);
 
   // Categories for the filter pills.
   useEffect(() => {

@@ -68,4 +68,23 @@ describe("server environment", () => {
     assert.equal(env.FLUTTERWAVE_SECRET_KEY, "FLWSECK-test");
     assert.equal(env.FLUTTERWAVE_WEBHOOK_HASH, "whsec-test");
   });
+
+  it("distinguishes the R2 S3 API endpoint from public delivery", () => {
+    const env = getServerEnv({
+      DATABASE_URL: databaseUrl,
+      R2_S3_ENDPOINT: "https://account.r2.cloudflarestorage.com",
+      R2_PUBLIC_BASE_URL: "https://media.example.test",
+    });
+    assert.equal(env.R2_S3_ENDPOINT, "https://account.r2.cloudflarestorage.com");
+    assert.equal(env.R2_PUBLIC_BASE_URL, "https://media.example.test");
+
+    assert.throws(
+      () =>
+        getServerEnv({
+          DATABASE_URL: databaseUrl,
+          R2_S3_ENDPOINT: "https://media.example.test",
+        }),
+      /R2 S3 API endpoint/,
+    );
+  });
 });

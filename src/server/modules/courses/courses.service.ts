@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import type { CursorPage } from "@/contracts/api";
 import type {
   OwnerCourseDetailDto,
@@ -94,18 +95,54 @@ export async function createCourse(
       throw new ApiError(409, "SLUG_UNAVAILABLE", "No unique slug could be derived from this title.");
     }
 
+    const courseId = randomUUID();
+    const totalLessons = input.curriculum.reduce(
+      (total, section) => total + section.lessons.length,
+      0,
+    );
+    const totalDurationSeconds = input.curriculum.reduce(
+      (courseTotal, section) =>
+        courseTotal +
+        section.lessons.reduce((sectionTotal, lesson) => sectionTotal + lesson.durationSeconds, 0),
+      0,
+    );
+
     const course = await transaction.course.create({
       data: {
+        id: courseId,
         slug,
         title: input.title,
         shortDescription: input.shortDescription,
         description: input.description,
+        promoVideoUrl: input.promoVideoUrl ?? null,
         categoryId: input.categoryId,
         creatorUserId: actorId,
         level: input.level,
         language: input.language,
         priceMinor: input.priceMinor,
+        totalSections: input.curriculum.length,
+        totalLessons,
+        totalMinutes: Math.ceil(totalDurationSeconds / 60),
+        sections: {
+          create: input.curriculum.map((section, sectionIndex) => ({
+            title: section.title,
+            position: sectionIndex + 1,
+            lessons: {
+              create: section.lessons.map((lesson, lessonIndex) => ({
+                courseId,
+                title: lesson.title,
+                type: lesson.type,
+                position: lessonIndex + 1,
+                durationSeconds: lesson.durationSeconds,
+                isPreview: lesson.isPreview,
+                content: lesson.content ?? null,
+                videoUrl: lesson.videoUrl ?? null,
+              })),
+            },
+          })),
+        },
       },
+      include: COURSE_DETAIL_INCLUDE,
     });
 
     await transaction.auditLog.create({
@@ -115,20 +152,17 @@ export async function createCourse(
         entityType: "Course",
         entityId: course.id,
         requestId,
-        metadata: { slug: course.slug },
+        metadata: {
+          slug: course.slug,
+          sectionCount: input.curriculum.length,
+          lessonCount: totalLessons,
+        },
       },
       select: { id: true },
     });
 
-    // The curriculum is empty on creation, so the detail DTO is assembled
-    // without re-reading the course.
-    return toOwnerCourseDetailDto({
-      ...course,
-      sections: [],
-      requirements: [],
-      outcomes: [],
-      category: { id: category.id, slug: category.slug, name: category.name },
-    });
+    // Nested create + include returns the complete draft without a second read.
+    return toOwnerCourseDetailDto(course as CourseDetailRow);
   });
 }
 
