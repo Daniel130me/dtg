@@ -314,3 +314,5 @@ documentation.
 | Error monitoring | In-repo (logger + error monitor + `/metrics`) | Sentry/OTel collector attachment is a config-time seam, documented here; no PII leaves the process by default (PII redaction per `docs/PRIVACY.md` §2) |
 | Load/security tests | Offline suites, not CI load runs | Run before launch against a production-like dataset; thresholds in file headers |
 | Single-process outbox dispatcher | On-demand endpoint, no scheduler in-process | External cron (§6) required for notification/email delivery SLA |
+
+Deployment status (2026-09-02): the production Neon project is wired (`DATABASE_URL` pooled / `DIRECT_URL` direct), R2 (bucket `dtg`) and SMTP (Gmail, port 587 STARTTLS) are configured and verified end-to-end via `scripts/verify-r2.ts` (S3 round-trip + public `r2.dev` delivery) and `scripts/verify-smtp.ts` (auth + one labelled test email). Flutterwave and the external alert channel remain the open seams.
