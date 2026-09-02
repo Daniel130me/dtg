@@ -58,6 +58,11 @@ const EMAIL_SEND_TIMEOUT_MS = 10_000;
 const EMAIL_SEND_ATTEMPTS = 2;
 const EMAIL_BREAKER_FAILURE_THRESHOLD = 5;
 const EMAIL_BREAKER_RESET_TIMEOUT_MS = 30_000;
+const SMTP_IMPLICIT_TLS_PORT = 465;
+const SMTP_STARTTLS_PORT = 587;
+const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
+const SMTP_GREETING_TIMEOUT_MS = 10_000;
+const SMTP_SOCKET_TIMEOUT_MS = 15_000;
 
 // Permanent errors do NOT count as breaker failures: they would fail again
 // with the circuit closed, so tripping on them would only mask the real cause.
@@ -94,7 +99,12 @@ function getSmtpTransporter(): Transporter {
   transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: env.SMTP_PORT === 465,
+    secure: env.SMTP_PORT === SMTP_IMPLICIT_TLS_PORT,
+    // Port 587 must upgrade to TLS rather than silently continuing in cleartext.
+    requireTLS: env.SMTP_PORT === SMTP_STARTTLS_PORT,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD },
     pool: true,
     maxConnections: 3,

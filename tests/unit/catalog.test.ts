@@ -112,8 +112,10 @@ describe("course list query parsing", () => {
     assert.equal(query.level, "BEGINNER");
   });
 
-  it("rejects unknown levels and out-of-range limits", () => {
-    assert.equal(courseListQuerySchema.safeParse({ level: "EXPERT" }).success, false);
+  it("accepts owner-managed levels and rejects invalid levels or limits", () => {
+    assert.equal(courseListQuerySchema.safeParse({ level: "EXPERT" }).success, true);
+    assert.equal(courseListQuerySchema.safeParse({ level: "   " }).success, false);
+    assert.equal(courseListQuerySchema.safeParse({ level: "a".repeat(81) }).success, false);
     assert.equal(
       courseListQuerySchema.safeParse({ limit: String(COURSE_PAGE_LIMIT_MAX + 1) }).success,
       false,

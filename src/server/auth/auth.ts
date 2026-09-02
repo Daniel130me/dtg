@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { APIError, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { PrismaClient } from "@prisma/client";
 import { db } from "@/server/db/client";
@@ -14,6 +14,10 @@ import {
   verifyPassword,
 } from "@/server/auth/password";
 import { issueEmailVerificationToken } from "@/server/auth/email-verification-token";
+import {
+  isReservedOwnerEmail,
+  normalizeRegistrationEmail,
+} from "@/server/auth/registration-policy";
 import { logger } from "@/server/observability/logger";
 
 const env = getServerEnv();
@@ -125,15 +129,25 @@ export function createAuthService(
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => ({
-            data: {
-              ...user,
-              email: user.email.trim().toLowerCase(),
-              emailNormalized: user.email.trim().toLowerCase(),
-              role: "STUDENT",
-              status: "ACTIVE",
-            },
-          }),
+          before: async (user) => {
+            const emailNormalized = normalizeRegistrationEmail(user.email);
+            if (isReservedOwnerEmail(emailNormalized, env.OWNER_EMAIL)) {
+              throw new APIError("FORBIDDEN", {
+                code: "OWNER_EMAIL_RESERVED",
+                message: "This email cannot be used for student registration.",
+              });
+            }
+
+            return {
+              data: {
+                ...user,
+                email: emailNormalized,
+                emailNormalized,
+                role: "STUDENT",
+                status: "ACTIVE",
+              },
+            };
+          },
           after: async (user) => {
             await database.$transaction([
               database.profile.create({

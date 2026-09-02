@@ -10,6 +10,11 @@ const optionalString = z.preprocess(
   z.string().trim().min(1).optional(),
 );
 
+const optionalEmail = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.email().transform((value) => value.trim().toLowerCase()).optional(),
+);
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -39,6 +44,8 @@ const serverEnvSchema = z
       .transform((value) => value === "true"),
     RATE_LIMIT_SALT: z.string().min(16).default("development-only-rate-limit-salt"),
     BETTER_AUTH_SECRET: z.string().min(32).default("development-only-auth-secret-change-me"),
+    // Reserved for the one provisioned instructor; public sign-up rejects it.
+    OWNER_EMAIL: optionalEmail,
     R2_BUCKET: optionalString,
     // R2's S3 API endpoint and public delivery URL serve different purposes.
     // Presigned requests only work with the r2.cloudflarestorage.com endpoint.

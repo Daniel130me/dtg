@@ -48,6 +48,19 @@ describe("server environment", () => {
     );
   });
 
+  it("normalizes a valid owner email and rejects malformed values", () => {
+    const env = getServerEnv({
+      DATABASE_URL: databaseUrl,
+      OWNER_EMAIL: "Owner@Example.COM",
+    });
+    assert.equal(env.OWNER_EMAIL, "owner@example.com");
+
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, OWNER_EMAIL: "not-an-email" }),
+      /OWNER_EMAIL/,
+    );
+  });
+
   it("rejects partial Flutterwave configuration", () => {
     assert.throws(
       () => getServerEnv({ DATABASE_URL: databaseUrl, FLUTTERWAVE_SECRET_KEY: "FLWSECK-test" }),
