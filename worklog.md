@@ -928,3 +928,26 @@ Stage Summary:
 - The pulled media/NGN wave is now green and verified in the browser; the repo's docs+tests are consistent with the NGN normalization behavior its own code documents
 - Reconfirmed sandbox behavior: gitignored dirs are wiped EVERY session - sandbox-db.sh + the (.env) repair path are now the standard first step; Prisma client regeneration added to the post-pull checklist
 - Pending from the wave (not regressions, just noted): R2 upload flow still needs real R2 credentials to exercise (env vars R2_S3_ENDPOINT/R2_PUBLIC_BASE_URL are optional-at-boot by design); 12-g's recovery recipe remains accurate with sandbox-db.sh as step 1
+
+---
+Task ID: 14-a (coordinator)
+Agent: main-coordinator
+Task: Wire the user's real credentials (Neon PostgreSQL, Cloudflare R2, Gmail SMTP, auth secrets) into the platform, migrate the production DB, and verify all integrations live
+
+Work Log:
+- Wrote the user's updated env to .env (gitignored): Neon pooled DATABASE_URL + DIRECT_URL + separate TEST_DATABASE_URL, real RATE_LIMIT_SALT/BETTER_AUTH_SECRET, R2 bucket "dtg" (account-scoped S3 endpoint + pub-...r2.dev public base), Gmail SMTP (587), OWNER_* values, ALLOW_OWNER_BOOTSTRAP=false
+- Neon was already 14/15 migrations ahead (real DB, not fresh): applied the one pending `currency_ngn` migration via db:migrate:deploy; `channel_binding=require` parses fine with Prisma 6
+- DB inspection: owner kosokodaniel@gmail.com already provisioned+verified, 17 students, 7 courses, 33 lessons, 6 reviews -> NO seed, NO owner bootstrap needed (respecting ALLOW_OWNER_BOOTSTRAP=false)
+- R2 verified end-to-end with zero residue (scripts/verify-r2.ts): HeadBucket 200 -> Put -> Head -> PUBLIC r2.dev fetch 200 -> Get round-trip match -> Delete + 404
+- SMTP verified (scripts/verify-smtp.ts): nodemailer verify() auth on smtp.gmail.com:587 STARTTLS OK + one labelled test email delivered to the user's own inbox
+- Restarted dev server detached with exported Neon URLs (the injected sqlite DATABASE_URL still shadows .env - export remains mandatory); health/ready 200 with database available, catalog serving Neon data (NGN, R2 thumbnails)
+- Diagnostics now reports smtpConfigured=true, r2Configured=true, paymentsConfigured=false (Flutterwave keys still absent, by design)
+- Found + cleared a real operational finding: 3 stale PENDING outbox events (2x enrolment.confirmed, 1x discussion.thread_created, up to ~15.7h old) queued by the user's real activity while SMTP was unset. Both recipients are the user's own addresses, so triggered the owner dispatch sweep: 3 processed / 3 completed / 0 failed / 3 in-app notifications created / 2 real confirmation emails delivered; outboxOldestPendingAgeSeconds now null
+- Browser E2E: owner login with the user's OWN password (G.s.o.m.1.2.3.) works -> /owner dashboard renders real Neon data (Welcome Oluwagbenga, 17 students / 7 courses / NGN 814.81 / 4.60, trend chart); bell badge shows the 3 dispatched notifications; catalog "Showing 7 of 7"; R2-hosted course thumbnail confirmed loading in-page (naturalWidth>0); mobile 390px homepage clean; zero console/page errors; dev.log zero errors
+- Quality gates: lint 0, typecheck 0 (fixed one strict-mode narrowing error in verify-r2.ts via a required() env helper); committed scripts/verify-r2.ts + scripts/verify-smtp.ts (env-driven, no secrets), ops handbook deployment-status note, and 4 evidence screenshots
+
+Stage Summary:
+- The platform now runs on the user's production stack: Neon Postgres (pooled runtime + direct migrations), R2 media (proven by round-trip AND live thumbnail render), Gmail SMTP (proven by auth test + 2 real outbox emails)
+- Both remaining launch deviations from Phase 12 (R2 unconfigured, SMTP unconfigured) are CLOSED; open seams: Flutterwave keys, external alert channel, outbox scheduler cron
+- New owner-facing ops tools: scripts/verify-r2.ts, scripts/verify-smtp.ts (reusable pre-launch smoke checks)
+- Reminder for future sessions: start dev with (export DATABASE_URL=<pooled> DIRECT_URL=<direct>; bun run dev > dev.log 2>&1 &) - the sandbox-injected sqlite URL still shadows .env
