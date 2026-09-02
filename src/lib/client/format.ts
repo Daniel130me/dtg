@@ -8,7 +8,8 @@ export function formatPrice(priceMinor: number, currency: string): string {
   if (priceMinor === 0) return "Free";
   const major = priceMinor / 100;
   try {
-    return new Intl.NumberFormat("en-US", {
+    const locale = currency === "NGN" ? "en-NG" : "en-US";
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
       minimumFractionDigits: major % 1 === 0 ? 0 : 2,

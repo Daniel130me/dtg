@@ -153,7 +153,7 @@ model PlatformSettings {
   id              String   @id @default("platform") @db.VarChar(32)
   ownerUserId     String   @unique @db.Uuid
   brandName       String   @default("DTG") @db.VarChar(120)
-  defaultCurrency String   @default("USD") @db.VarChar(3)
+  defaultCurrency String   @default("NGN") @db.VarChar(3)
   supportEmail    String?  @db.VarChar(320)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -320,7 +320,7 @@ model Course {
   language         String       @default("English") @db.VarChar(32)
   // Money uses integer minor units; a zero price marks the course free.
   priceMinor       Int
-  currency         String       @default("USD") @db.VarChar(3)
+  currency         String       @default("NGN") @db.VarChar(3)
   status           CourseStatus @default(DRAFT)
   version          Int          @default(1)
   // Denormalized aggregates: course totals are maintained transactionally by

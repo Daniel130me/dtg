@@ -218,7 +218,8 @@ export function minorToMajor(amountMinor: number): number {
 export function formatMoney(amountMinor: number, currency: string): string {
   const major = amountMinor / 100;
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(major);
+    const locale = currency === "NGN" ? "en-NG" : "en-US";
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(major);
   } catch {
     // Unknown currency codes fall back to a symbol-less amount.
     const sign = major < 0 ? "-" : "";
@@ -226,19 +227,20 @@ export function formatMoney(amountMinor: number, currency: string): string {
   }
 }
 
-/** Compact axis money for chart ticks: "$12.5K" / "$480" / "$12.40". */
+/** Compact axis money for chart ticks: "₦12.5K" / "₦480" / "₦12.40". */
 export function formatAxisMoney(amountMinor: number, currency: string): string {
   const major = amountMinor / 100;
   try {
+    const locale = currency === "NGN" ? "en-NG" : "en-US";
     if (Math.abs(major) >= 1000) {
-      return new Intl.NumberFormat("en-US", {
+      return new Intl.NumberFormat(locale, {
         style: "currency",
         currency,
         notation: "compact",
         maximumFractionDigits: 1,
       }).format(major);
     }
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
       maximumFractionDigits: major % 1 === 0 ? 0 : 2,

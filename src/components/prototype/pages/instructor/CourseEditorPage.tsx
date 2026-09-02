@@ -834,7 +834,7 @@ function MetadataTab({ course, categories, levels, onSaved }: MetadataTabProps) 
                 placeholder="49.99"
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                $
+                ₦
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
