@@ -1,4 +1,4 @@
-import { EnrolmentStatus, Prisma } from "@prisma/client";
+import { EnrolmentStatus, LessonStatus, Prisma } from "@prisma/client";
 import { FREE_PRICE_MINOR } from "@/contracts/catalog";
 import {
   enrolmentListQuerySchema,
@@ -12,7 +12,11 @@ import { withTransaction } from "@/server/db/transaction";
 import { ApiError } from "@/server/http/errors";
 import { decodeCursor, encodeCursor } from "@/server/http/pagination";
 import { describeFreeEnrolmentEligibility } from "@/server/modules/enrolments/enrolments.logic";
-import { computeProgressPercent } from "@/server/modules/learning/learning.logic";
+import {
+  compareCurriculumOrder,
+  computeProgressPercent,
+  pickNextLesson,
+} from "@/server/modules/learning/learning.logic";
 
 // Authorization model: /api/v1/learning routes resolve the caller through
 // requireAuthenticatedUser(headers) and every query is pinned to that user id,
@@ -46,7 +50,11 @@ const ENROLMENT_WITH_COURSE_SELECT = {
 
 type EnrolmentRow = Prisma.EnrolmentGetPayload<{ select: typeof ENROLMENT_WITH_COURSE_SELECT }>;
 
-function toEnrolmentDto(row: EnrolmentRow, completedLessons: number | null): EnrolmentDto {
+function toEnrolmentDto(
+  row: EnrolmentRow,
+  completedLessons: number | null,
+  nextLesson: EnrolmentDto["nextLesson"] = null,
+): EnrolmentDto {
   return {
     id: row.id,
     courseId: row.courseId,
@@ -69,6 +77,7 @@ function toEnrolmentDto(row: EnrolmentRow, completedLessons: number | null): Enr
       categorySlug: row.course.category.slug,
     },
     progress: toEnrolmentProgress(row, completedLessons),
+    nextLesson,
   };
 }
 
@@ -292,12 +301,73 @@ export async function listMyEnrolments(userId: string, input: unknown): Promise<
     : [];
   const completedByCourse = new Map(progressCounts.map((row) => [row.courseId, row._count._all]));
 
+  // Resume pointers: the same pickNextLesson rule the dashboard uses, computed
+  // for every course on the page with 2 extra queries total (lessons + the
+  // caller's completion rows), keeping the read model bounded.
+  const nextLessonByCourse = new Map<string, EnrolmentDto["nextLesson"]>();
+  if (pageCourseIds.length > 0) {
+    const [publishedLessons, completedRows] = await Promise.all([
+      db.lesson.findMany({
+        where: { courseId: { in: pageCourseIds }, status: LessonStatus.PUBLISHED },
+        select: {
+          id: true,
+          courseId: true,
+          title: true,
+          type: true,
+          durationSeconds: true,
+          isPreview: true,
+          position: true,
+          section: { select: { position: true } },
+        },
+      }),
+      db.lessonProgress.findMany({
+        where: { userId, courseId: { in: pageCourseIds } },
+        select: { courseId: true, lessonId: true },
+      }),
+    ]);
+
+    const completedIdsByCourse = new Map<string, Set<string>>();
+    for (const row of completedRows) {
+      const set = completedIdsByCourse.get(row.courseId) ?? new Set<string>();
+      set.add(row.lessonId);
+      completedIdsByCourse.set(row.courseId, set);
+    }
+    const lessonsByCourse = new Map<string, typeof publishedLessons>();
+    for (const lesson of publishedLessons) {
+      const list = lessonsByCourse.get(lesson.courseId) ?? [];
+      list.push(lesson);
+      lessonsByCourse.set(lesson.courseId, list);
+    }
+    for (const courseId of pageCourseIds) {
+      const orderedLessons = (lessonsByCourse.get(courseId) ?? []).sort((a, b) =>
+        compareCurriculumOrder(
+          { sectionPosition: a.section.position, position: a.position },
+          { sectionPosition: b.section.position, position: b.position },
+        ),
+      );
+      const next = pickNextLesson(orderedLessons, completedIdsByCourse.get(courseId) ?? new Set());
+      nextLessonByCourse.set(
+        courseId,
+        next
+          ? {
+              id: next.id,
+              title: next.title,
+              type: next.type,
+              durationSeconds: next.durationSeconds,
+              isPreview: next.isPreview,
+            }
+          : null,
+      );
+    }
+  }
+
   return {
     items: items.map((row) =>
       toEnrolmentDto(
         row,
         // REVOKED enrolments carry no progress block (null completedLessons).
         row.status === EnrolmentStatus.REVOKED ? null : completedByCourse.get(row.courseId) ?? 0,
+        row.status === EnrolmentStatus.REVOKED ? null : nextLessonByCourse.get(row.courseId) ?? null,
       ),
     ),
     nextCursor:

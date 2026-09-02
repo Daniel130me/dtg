@@ -6,6 +6,9 @@ import { withTransaction } from "@/server/db/transaction";
 import { ApiError } from "@/server/http/errors";
 import {
   computeProgressPercent,
+  evaluateLessonCompletionGate,
+  LESSON_COMPLETION_GATE_ASSIGNMENT,
+  LESSON_COMPLETION_GATE_QUIZ,
   pickNextLesson,
   shouldCompleteCourse,
 } from "@/server/modules/learning/learning.logic";
@@ -98,7 +101,16 @@ export async function markLessonCompleted(
 ): Promise<ProgressResultDto> {
   const lesson = await db.lesson.findUnique({
     where: { id: lessonId },
-    select: { id: true, courseId: true, status: true },
+    select: {
+      id: true,
+      courseId: true,
+      status: true,
+      type: true,
+      // Assessment gating: a QUIZ/ASSIGNMENT lesson only counts once the
+      // learner has actually done the work (see evaluateLessonCompletionGate).
+      quiz: { select: { id: true } },
+      assignment: { select: { id: true } },
+    },
   });
   if (!lesson || lesson.status !== LessonStatus.PUBLISHED) {
     throw new ApiError(404, LESSON_NOT_FOUND, "The lesson was not found.");
@@ -110,6 +122,38 @@ export async function markLessonCompleted(
   });
   if (!enrolment || enrolment.status !== EnrolmentStatus.ACTIVE) {
     throw new ApiError(422, COURSE_NOT_ENROLLED, "Enroll in the course to track progress.");
+  }
+
+  // Coursera-style gate: the attempt/submission facts are read only for
+  // assessment lessons, and only one of the two probes can ever run.
+  let quizPassed: boolean | null = null;
+  let assignmentSubmitted: boolean | null = null;
+  if (lesson.type === "QUIZ" && lesson.quiz) {
+    const passedAttempt = await db.quizAttempt.findFirst({
+      where: { quizId: lesson.quiz.id, userId, status: "SUBMITTED", passed: true },
+      select: { id: true },
+    });
+    quizPassed = passedAttempt !== null;
+  } else if (lesson.type === "ASSIGNMENT" && lesson.assignment) {
+    const submission = await db.assignmentSubmission.findFirst({
+      where: { assignmentId: lesson.assignment.id, userId },
+      select: { id: true },
+    });
+    assignmentSubmitted = submission !== null;
+  }
+  const gate = evaluateLessonCompletionGate({
+    lessonType: lesson.type,
+    quizPassed,
+    assignmentSubmitted,
+  });
+  if (!gate.allowed) {
+    throw new ApiError(
+      422,
+      gate.reason === LESSON_COMPLETION_GATE_QUIZ
+        ? "LESSON_COMPLETION_QUIZ_NOT_PASSED"
+        : "LESSON_COMPLETION_ASSIGNMENT_NOT_SUBMITTED",
+      gate.message ?? "Complete the lesson requirements first.",
+    );
   }
 
   return withTransaction(async (tx) => {

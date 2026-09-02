@@ -14,7 +14,7 @@ import StarRating from '@/components/prototype/shared/StarRating';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import CourseReviewsSection from '@/components/prototype/pages/public/CourseReviewsSection';
 import { fetchCourseDetail } from '@/features/catalog/api';
-import { enrollInCourse, fetchCourseEnrolmentState, reconcileOrder, startCheckout } from '@/features/learning/api';
+import { enrollInCourse, fetchCourseEnrolmentState, fetchCourseProgress, reconcileOrder, startCheckout } from '@/features/learning/api';
 import { ApiClientError } from '@/lib/client/api-client';
 import { authClient } from '@/lib/client/auth-client';
 import { formatCount, formatDuration, formatLessonDuration, formatLevel, formatPrice } from '@/lib/client/format';
@@ -161,6 +161,8 @@ export default function CourseDetailPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [enrolmentLoadedKey, setEnrolmentLoadedKey] = useState<string | null>(null);
+  // Resume pointer for the enrolled CTA: the first not-yet-completed lesson.
+  const [classroomHref, setClassroomHref] = useState<string | null>(null);
   // Order ids this page instance already reconciled. Lives above the probe
   // effect because the probe yields its enrolment write to this flow (below).
   const reconciledOrderIdsRef = useRef<Set<string>>(new Set());
@@ -183,6 +185,23 @@ export default function CourseDetailPage() {
         // state. Empty ref = no checkout-return flow = behave exactly as before.
         if (reconciledOrderIdsRef.current.size === 0) setEnrolmentState(state);
         setEnrolmentLoadedKey(enrolmentRequestKey);
+        // Enrolled learners get a deep link into the classroom (next lesson),
+        // not a detour through the My Learning index. Failure falls back to
+        // the honest index link below.
+        if (state.enrolled) {
+          fetchCourseProgress(slug)
+            .then((progress) => {
+              if (cancelled) return;
+              setClassroomHref(
+                progress.nextLesson
+                  ? `/learning/${encodeURIComponent(slug)}/${encodeURIComponent(progress.nextLesson.id)}`
+                  : '/learning',
+              );
+            })
+            .catch(() => undefined);
+        } else {
+          setClassroomHref(null);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -506,9 +525,8 @@ export default function CourseDetailPage() {
                       <CheckCircle2 className='size-4 shrink-0' />
                       You&apos;re enrolled in this course
                     </div>
-                    {/* The lesson player is a later phase — /learning is the honest destination. */}
                     <Button className='w-full' size='lg' asChild>
-                      <Link href='/learning'>Go to Classroom</Link>
+                      <Link href={classroomHref ?? '/learning'}>Go to Classroom</Link>
                     </Button>
                   </div>
                 ) : sessionPending || enrolmentLoading ? (

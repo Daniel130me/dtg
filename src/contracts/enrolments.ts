@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LESSON_TYPES } from "@/contracts/catalog";
 
 // ---------------------------------------------------------------------------
 // Named constants (no magic values)
@@ -80,6 +81,18 @@ export const enrolmentDtoSchema = z.object({
   revokedAt: z.iso.datetime().nullable(),
   course: enrolledCourseSummarySchema,
   progress: enrolmentProgressSchema.nullable(),
+  /** Resume pointer: the first not-yet-completed published lesson (null when
+   *  everything is done or the enrolment is revoked). Mirrors the dashboard
+   *  card's nextLesson so "Continue" can deep-link into the classroom. */
+  nextLesson: z
+    .object({
+      id: z.uuid(),
+      title: z.string(),
+      type: z.enum(LESSON_TYPES),
+      durationSeconds: z.number().int().nonnegative(),
+      isPreview: z.boolean(),
+    })
+    .nullable(),
 });
 
 export const paginatedEnrolmentsSchema = z.object({

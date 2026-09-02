@@ -679,6 +679,40 @@ export const openApiDocument = {
         },
       },
     },
+    "/owner/grading/submissions/{submissionId}/return": {
+      post: {
+        operationId: "returnSubmission",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "submissionId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Submission returned for revision with feedback; learner may resubmit." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Submission not found." },
+          "422": { description: "Submission was already returned or body validation failed." },
+        },
+      },
+    },
+    "/owner/certificates": {
+      get: {
+        operationId: "listOwnerCertificates",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "courseId", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "status", in: "query", schema: { type: "string", enum: ["ACTIVE", "REVOKED"] } },
+          { name: "search", in: "query", schema: { type: "string", maxLength: 191 } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "Cursor-paginated certificates with learner and course context (newest first)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
     "/learning/certificates": {
       get: {
         operationId: "listMyCertificates",

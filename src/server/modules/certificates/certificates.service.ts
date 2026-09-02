@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import {
   CertificateStatus,
   CourseStatus,
@@ -15,7 +16,9 @@ import {
   CERTIFICATE_REVOKED,
   type CertificateDto,
   type MyCertificatesDto,
+  type PaginatedOwnerCertificatesDto,
   type PublicCertificateDto,
+  ownerCertificatesQuerySchema,
 } from "@/contracts/certificates";
 import { db } from "@/server/db/client";
 import { withTransaction } from "@/server/db/transaction";
@@ -536,5 +539,109 @@ export async function verifyPublicCertificate(rawCode: string): Promise<PublicCe
     learnerName: certificate.user.profile?.displayName ?? certificate.user.name,
     courseTitle: certificate.course.title,
     brandName: settings?.brandName ?? DEFAULT_BRAND_NAME,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Owner console list
+// ---------------------------------------------------------------------------
+
+const OWNER_CERTIFICATES_LIMIT_MAX = 50;
+const ownerCertificatesCursorSchema = z.object({
+  issuedAt: z.iso.datetime(),
+  id: z.uuid(),
+});
+
+function encodeCertificatesCursor(cursor: { issuedAt: string; id: string }): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeCertificatesCursor(value: string): { issuedAt: string; id: string } {
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    return ownerCertificatesCursorSchema.parse(decoded);
+  } catch {
+    throw new ApiError(422, "INVALID_CURSOR", "The pagination cursor is invalid.");
+  }
+}
+
+/**
+ * Owner console certificate list, newest first, filterable by course, status
+ * and a search box that matches learner name / email / certificate code.
+ * Mirrors the grading queue's keyset pagination.
+ *
+ * Query budget: 2 (page + total) regardless of depth.
+ */
+export async function listCertificatesForOwner(
+  input: unknown,
+): Promise<PaginatedOwnerCertificatesDto> {
+  const query = ownerCertificatesQuerySchema.parse(input);
+
+  const where: Prisma.CertificateWhereInput = {
+    ...(query.courseId ? { courseId: query.courseId } : {}),
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.search
+      ? {
+          OR: [
+            { code: { contains: query.search, mode: "insensitive" } },
+            { user: { is: { email: { contains: query.search, mode: "insensitive" } } } },
+            { user: { is: { name: { contains: query.search, mode: "insensitive" } } } },
+          ],
+        }
+      : {}),
+  };
+  if (query.cursor) {
+    const cursor = decodeCertificatesCursor(query.cursor);
+    const cursorDate = new Date(cursor.issuedAt);
+    where.AND = [
+      {
+        OR: [
+          { issuedAt: { lt: cursorDate } },
+          { issuedAt: cursorDate, id: { lt: cursor.id } },
+        ],
+      },
+    ];
+  }
+
+  const limit = Math.min(query.limit, OWNER_CERTIFICATES_LIMIT_MAX);
+  const [rows, total] = await Promise.all([
+    db.certificate.findMany({
+      where,
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        issuedAt: true,
+        revokedAt: true,
+        revokedReason: true,
+        user: { select: { id: true, name: true, email: true } },
+        course: { select: { id: true, title: true, slug: true } },
+      },
+      orderBy: [{ issuedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    }),
+    db.certificate.count({ where }),
+  ]);
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  const lastItem = items.at(-1);
+
+  return {
+    items: items.map((row) => ({
+      id: row.id,
+      code: row.code,
+      status: row.status,
+      issuedAt: row.issuedAt.toISOString(),
+      revokedAt: row.revokedAt?.toISOString() ?? null,
+      revokedReason: row.revokedReason,
+      learner: row.user,
+      course: row.course,
+    })),
+    nextCursor:
+      hasMore && lastItem
+        ? encodeCertificatesCursor({ issuedAt: lastItem.issuedAt.toISOString(), id: lastItem.id })
+        : null,
+    total,
   };
 }

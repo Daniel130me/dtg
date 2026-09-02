@@ -17,6 +17,7 @@ export type ViewName =
   | 'student-management'
   | 'analytics'
   | 'grading'
+  | 'certificates-admin'
   | 'reviews'
   | 'create-course';
 

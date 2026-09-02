@@ -827,6 +827,10 @@ model AssignmentSubmission {
   // keeps a verified MediaAsset reference drop-in for the media phase.
   body          String           @db.VarChar(20000)
   attachmentUrl String?          @db.VarChar(2048)
+  // "Return for revision": the owner sends the submission back with feedback;
+  // the learner answers with a fresh attempt row (this row keeps the history).
+  returnedFeedback String?       @db.VarChar(5000)
+  returnedAt       DateTime?
   submittedAt   DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 

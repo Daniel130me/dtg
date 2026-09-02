@@ -3,18 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Clock, LogIn, PlayCircle, Trophy } from 'lucide-react';
+import { ArrowRight, Award, BookOpen, Clock, LogIn, PlayCircle, Trophy } from 'lucide-react';
 import StudentLayout from '@/components/prototype/layout/StudentLayout';
 import { authClient } from '@/lib/client/auth-client';
 import { ApiClientError } from '@/lib/client/api-client';
 import { formatDuration } from '@/lib/client/format';
 import { fetchLearnerDashboard } from '@/features/learning/api';
+import { fetchMyCertificates } from '@/features/learning/certificates-api';
 import { FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import {
   CONTINUE_LEARNING_LIMIT,
   type ContinueLearningCardDto,
   type LearnerDashboardDto,
 } from '@/contracts/learning';
+import type { MyCertificatesDto } from '@/contracts/certificates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -202,6 +204,8 @@ export default function StudentDashboard() {
   const [loadedKey, setLoadedKey] = useState<number | null>(null);
   const requestKey = retrySeed;
   const loading = loadedKey !== requestKey;
+  // Secondary certificates read (issued + claimable) for the dashboard card.
+  const [certificates, setCertificates] = useState<MyCertificatesDto | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -221,6 +225,13 @@ export default function StudentDashboard() {
         });
         setLoadedKey(requestKey);
       });
+    // Certificates summary is a secondary read: its failure must never break
+    // the dashboard, so it resolves silently and the card simply stays hidden.
+    fetchMyCertificates()
+      .then((data) => {
+        if (!cancelled) setCertificates(data);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -292,7 +303,7 @@ export default function StudentDashboard() {
               </Button>
               <Button
                 variant='outline'
-                className='border-white/30 text-white hover:bg-white/10'
+                className='border-white/30 bg-transparent text-white hover:bg-white/10 hover:text-white'
                 asChild
               >
                 <Link href='/courses'>Browse Courses</Link>
@@ -370,6 +381,48 @@ export default function StudentDashboard() {
                 </motion.div>
               ))}
             </motion.div>
+
+            {/* Certificates summary card (hidden until there is something to show) */}
+            {certificates &&
+              (certificates.certificates.length > 0 || certificates.eligibleCourses.length > 0) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.35 }}
+                >
+                  <Card className='border-amber-200 bg-gradient-to-r from-amber-50 to-transparent dark:border-amber-900 dark:from-amber-950/40 py-0'>
+                    <CardContent className='flex flex-col sm:flex-row sm:items-center gap-4 p-4 sm:p-5'>
+                      <div className='size-11 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0'>
+                        <Award className='size-5' />
+                      </div>
+                      <div className='flex-1 min-w-0'>
+                        <p className='font-semibold text-sm'>
+                          {certificates.eligibleCourses.length > 0
+                            ? `You can claim ${certificates.eligibleCourses.length} certificate${
+                                certificates.eligibleCourses.length > 1 ? 's' : ''
+                              }`
+                            : 'Your certificates'}
+                        </p>
+                        <p className='text-xs text-muted-foreground'>
+                          {certificates.certificates.length > 0 &&
+                            `${certificates.certificates.length} earned`}
+                          {certificates.certificates.length > 0 &&
+                            certificates.eligibleCourses.length > 0 &&
+                            ' · '}
+                          {certificates.eligibleCourses.length > 0 &&
+                            `${certificates.eligibleCourses.length} ready to claim`}
+                        </p>
+                      </div>
+                      <Button size='sm' className='shrink-0' asChild>
+                        <Link href='/certificates'>
+                          <Award className='size-4 mr-1.5' />
+                          View certificates
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
 
             {/* Continue Learning rail */}
             <motion.div

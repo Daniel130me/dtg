@@ -11,6 +11,9 @@ import {
   compareCurriculumOrder,
   computeProgressPercent,
   describeLessonAccess,
+  evaluateLessonCompletionGate,
+  LESSON_COMPLETION_GATE_ASSIGNMENT,
+  LESSON_COMPLETION_GATE_QUIZ,
   pickContinueLearningCourses,
   pickNextLesson,
   shouldCompleteCourse,
@@ -171,6 +174,49 @@ describe("notes export rendering", () => {
 
   it("has an honest empty state", () => {
     assert.equal(buildNotesExportMarkdown([]), "# My notes\n\nNo saved notes yet.\n");
+  });
+});
+
+describe("lesson completion gate (Coursera-style assessment enforcement)", () => {
+  it("never gates VIDEO or TEXT lessons", () => {
+    for (const lessonType of ["VIDEO", "TEXT"] as const) {
+      const decision = evaluateLessonCompletionGate({ lessonType, quizPassed: false, assignmentSubmitted: false });
+      assert.equal(decision.allowed, true);
+      assert.equal(decision.reason, null);
+    }
+  });
+
+  it("gates a QUIZ lesson until a passed attempt exists", () => {
+    const blocked = evaluateLessonCompletionGate({ lessonType: "QUIZ", quizPassed: false, assignmentSubmitted: null });
+    assert.deepEqual(blocked, {
+      allowed: false,
+      reason: LESSON_COMPLETION_GATE_QUIZ,
+      message: "Pass the quiz to complete this lesson.",
+    });
+    const allowed = evaluateLessonCompletionGate({ lessonType: "QUIZ", quizPassed: true, assignmentSubmitted: null });
+    assert.equal(allowed.allowed, true);
+  });
+
+  it("gates an ASSIGNMENT lesson until a submission exists", () => {
+    const blocked = evaluateLessonCompletionGate({ lessonType: "ASSIGNMENT", quizPassed: null, assignmentSubmitted: false });
+    assert.deepEqual(blocked, {
+      allowed: false,
+      reason: LESSON_COMPLETION_GATE_ASSIGNMENT,
+      message: "Submit the assignment to complete this lesson.",
+    });
+    const allowed = evaluateLessonCompletionGate({ lessonType: "ASSIGNMENT", quizPassed: null, assignmentSubmitted: true });
+    assert.equal(allowed.allowed, true);
+  });
+
+  it("does not gate assessment lessons with nothing authored (half-configured lessons stay completable)", () => {
+    const unauthoredQuiz = evaluateLessonCompletionGate({ lessonType: "QUIZ", quizPassed: null, assignmentSubmitted: null });
+    assert.equal(unauthoredQuiz.allowed, true);
+    const unauthoredAssignment = evaluateLessonCompletionGate({
+      lessonType: "ASSIGNMENT",
+      quizPassed: null,
+      assignmentSubmitted: null,
+    });
+    assert.equal(unauthoredAssignment.allowed, true);
   });
 });
 

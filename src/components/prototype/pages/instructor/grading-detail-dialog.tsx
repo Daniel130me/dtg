@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ExternalLink, FileCheck, Loader2, RotateCw, Save } from 'lucide-react';
+import { ExternalLink, FileCheck, Loader2, RotateCcw, RotateCw, Save, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { fetchGradingDetail, gradeSubmission } from '@/features/owner/assessments-api';
+import { fetchGradingDetail, gradeSubmission, returnSubmission } from '@/features/owner/assessments-api';
 import { showActionErrorToast } from '@/features/owner/toast-helpers';
 import { ApiClientError } from '@/lib/client/api-client';
 import type { GradingDetailDto } from '@/contracts/assessments';
@@ -61,6 +61,11 @@ export default function GradingDetailDialog({ submissionId, onClose, onGraded }:
   const [feedback, setFeedback] = useState('');
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [grading, setGrading] = useState(false);
+
+  // "Return for revision" flow (draft-only until confirmed).
+  const [returnMode, setReturnMode] = useState(false);
+  const [returnFeedback, setReturnFeedback] = useState('');
+  const [returning, setReturning] = useState(false);
 
   // Request-key pattern; refreshing bumps reloadToken so the detail refetches
   // right after a grade is recorded.
@@ -122,6 +127,26 @@ export default function GradingDetailDialog({ submissionId, onClose, onGraded }:
       showActionErrorToast(error, 'The grade could not be recorded.');
     } finally {
       setGrading(false);
+    }
+  };
+
+  const handleReturnForRevision = async () => {
+    if (!detail || returning) return;
+    const trimmed = returnFeedback.trim();
+    if (trimmed === '') return;
+    setReturning(true);
+    try {
+      await returnSubmission(submissionId, { feedback: trimmed });
+      toast.success('Returned for revision');
+      setReturnMode(false);
+      setReturnFeedback('');
+      setReloadToken((token) => token + 1);
+      onGraded();
+    } catch (error) {
+      // SUBMISSION_NOT_RETURNABLE / SUBMISSION_NOT_FOUND surface via the message.
+      showActionErrorToast(error, 'The submission could not be returned.');
+    } finally {
+      setReturning(false);
     }
   };
 
@@ -194,6 +219,15 @@ export default function GradingDetailDialog({ submissionId, onClose, onGraded }:
                     <ExternalLink className="size-3.5 shrink-0" />
                     Open attachment
                   </a>
+                )}
+                {detail.submission.status === 'RETURNED' && detail.submission.returnedFeedback && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    <Undo2 className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                    <p className="whitespace-pre-wrap">
+                      Returned for revision{detail.submission.returnedAt ? ` · ${formatDateTime(detail.submission.returnedAt)}` : ''}
+                      — “{detail.submission.returnedFeedback}”
+                    </p>
+                  </div>
                 )}
               </section>
 
@@ -269,12 +303,72 @@ export default function GradingDetailDialog({ submissionId, onClose, onGraded }:
                     />
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <Button onClick={() => void handleRecordGrade()} disabled={grading}>
-                    {grading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Save className="size-4 mr-2" />}
-                    Record grade
-                  </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {detail.submission.status !== 'RETURNED' && !returnMode && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setReturnMode(true)}
+                      disabled={grading}
+                      className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950"
+                    >
+                      <Undo2 className="size-4" />
+                      Return for revision
+                    </Button>
+                  )}
+                  {!returnMode && (
+                    <Button onClick={() => void handleRecordGrade()} disabled={grading}>
+                      {grading ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Save className="size-4 mr-2" />}
+                      Record grade
+                    </Button>
+                  )}
                 </div>
+                {returnMode && (
+                  <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/40">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="return-feedback">
+                        Revision feedback <span className="text-destructive">*</span>
+                      </Label>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {returnFeedback.length}/{GRADE_FEEDBACK_MAX}
+                      </span>
+                    </div>
+                    <Textarea
+                      id="return-feedback"
+                      value={returnFeedback}
+                      maxLength={GRADE_FEEDBACK_MAX}
+                      rows={3}
+                      placeholder="Tell the learner what to revise..."
+                      onChange={(event) => setReturnFeedback(event.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The learner keeps this attempt as RETURNED and answers with a fresh submission.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setReturnMode(false);
+                          setReturnFeedback('');
+                        }}
+                        disabled={returning}
+                      >
+                        <RotateCcw className="size-3.5 mr-1.5" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-900"
+                        onClick={() => void handleReturnForRevision()}
+                        disabled={returning || returnFeedback.trim() === ''}
+                      >
+                        {returning ? <Loader2 className="size-3.5 mr-1.5 animate-spin" /> : <Undo2 className="size-3.5 mr-1.5" />}
+                        Return submission
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           </>

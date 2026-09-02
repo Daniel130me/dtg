@@ -29,6 +29,58 @@ export function shouldCompleteCourse(completedLessons: number, totalLessons: num
 }
 
 // ---------------------------------------------------------------------------
+// Lesson completion gate (Coursera-style assessment enforcement)
+// ---------------------------------------------------------------------------
+
+export const LESSON_COMPLETION_GATE_QUIZ = "LESSON_COMPLETION_QUIZ_NOT_PASSED";
+export const LESSON_COMPLETION_GATE_ASSIGNMENT = "LESSON_COMPLETION_ASSIGNMENT_NOT_SUBMITTED";
+
+export interface LessonCompletionGateInput {
+  lessonType: "VIDEO" | "TEXT" | "QUIZ" | "ASSIGNMENT";
+  /** Whether the learner has a PASSED attempt on the lesson's authored quiz (null = no quiz authored). */
+  quizPassed: boolean | null;
+  /** Whether the learner has at least one submission on the lesson's authored assignment (null = none authored). */
+  assignmentSubmitted: boolean | null;
+}
+
+export interface LessonCompletionGateDecision {
+  allowed: boolean;
+  /** Client-matchable reason code when blocked, null when allowed. */
+  reason: string | null;
+  /** Human sentence for toasts/hints, null when allowed. */
+  message: string | null;
+}
+
+/**
+ * Single decision point for completing an assessment lesson:
+ * - VIDEO/TEXT lessons are never gated;
+ * - a QUIZ lesson with an authored quiz requires a PASSED attempt (a quiz
+ *   lesson WITHOUT an authored quiz stays completable — the same convention
+ *   certificate eligibility uses, so an owner's half-configured lesson can
+ *   never brick a learner's progress);
+ * - an ASSIGNMENT lesson with an authored assignment requires at least one
+ *   submission (graded or not — the certificate, not the lesson tick, waits
+ *   for the grade).
+ */
+export function evaluateLessonCompletionGate(input: LessonCompletionGateInput): LessonCompletionGateDecision {
+  if (input.lessonType === "QUIZ" && input.quizPassed === false) {
+    return {
+      allowed: false,
+      reason: LESSON_COMPLETION_GATE_QUIZ,
+      message: "Pass the quiz to complete this lesson.",
+    };
+  }
+  if (input.lessonType === "ASSIGNMENT" && input.assignmentSubmitted === false) {
+    return {
+      allowed: false,
+      reason: LESSON_COMPLETION_GATE_ASSIGNMENT,
+      message: "Submit the assignment to complete this lesson.",
+    };
+  }
+  return { allowed: true, reason: null, message: null };
+}
+
+// ---------------------------------------------------------------------------
 // Lesson access
 // ---------------------------------------------------------------------------
 

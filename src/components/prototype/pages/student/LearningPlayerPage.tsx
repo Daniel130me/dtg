@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -247,6 +247,26 @@ export default function LearningPlayerPage() {
   const [curriculumOpen, setCurriculumOpen] = useState(false);
   // Certificate claim pending guard (celebration panel affordance).
   const [claimingCertificate, setClaimingCertificate] = useState(false);
+  // Coursera-style assessment gate for QUIZ/ASSIGNMENT lessons: the assessment
+  // panels report satisfaction here so "Mark as complete" can explain itself.
+  // Defaults to satisfied (VIDEO/TEXT lessons and pre-fetch states are ungated);
+  // the server remains the authoritative gate either way.
+  const [assessmentGate, setAssessmentGate] = useState<{ satisfied: boolean; message: string | null }>({
+    satisfied: true,
+    message: null,
+  });
+
+  // Panels are remounted per lesson; reset the gate until the new lesson's
+  // panel reports (VIDEO/TEXT lessons simply never report, staying ungated).
+  useEffect(() => {
+    setAssessmentGate({ satisfied: true, message: null });
+  }, [lessonId]);
+
+  const handleGateChange = useCallback((satisfied: boolean, message: string | null) => {
+    setAssessmentGate((prev) =>
+      prev.satisfied === satisfied && prev.message === message ? prev : { satisfied, message },
+    );
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -435,13 +455,25 @@ export default function LearningPlayerPage() {
   } else {
     // QUIZ / ASSIGNMENT (Phase 9): the real assessment panels render for
     // enrolled learners (access gating is decided here, same as notes);
-    // preview visitors get the enroll message. Completion stays enabled (the
-    // server is the gate for what counts).
+    // preview visitors get the enroll message. The panels also report the
+    // Coursera-style completion gate (pass the quiz / submit the assignment).
     lessonBody = isEnrolled ? (
       lesson.type === 'QUIZ' ? (
-        <PlayerQuizPanel lessonId={lessonId} />
+        <PlayerQuizPanel
+          lessonId={lessonId}
+          onGateChange={handleGateChange}
+          onComplete={() => {
+            void handleMarkComplete();
+          }}
+        />
       ) : (
-        <PlayerAssignmentPanel lessonId={lessonId} />
+        <PlayerAssignmentPanel
+          lessonId={lessonId}
+          onGateChange={handleGateChange}
+          onComplete={() => {
+            void handleMarkComplete();
+          }}
+        />
       )
     ) : (
       <div className='flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950'>
@@ -572,17 +604,28 @@ export default function LearningPlayerPage() {
 
             {/* Completion (enrolled learners only) */}
             {isEnrolled && (
-              <div className='flex items-center justify-end'>
+              <div className='flex flex-col items-end gap-1'>
                 {isCurrentCompleted ? (
                   <Button variant='secondary' disabled className='gap-1.5'>
                     <CheckCircle2 className='size-4 text-emerald-600' />
                     Completed
                   </Button>
                 ) : (
-                  <Button onClick={handleMarkComplete} disabled={completing} className='gap-1.5'>
-                    {completing && <Loader2 className='size-4 animate-spin' />}
-                    Mark as complete
-                  </Button>
+                  <>
+                    <Button
+                      onClick={handleMarkComplete}
+                      disabled={completing || !assessmentGate.satisfied}
+                      className='gap-1.5'
+                    >
+                      {completing && <Loader2 className='size-4 animate-spin' />}
+                      Mark as complete
+                    </Button>
+                    {!assessmentGate.satisfied && assessmentGate.message && (
+                      <p className='text-xs text-amber-600 dark:text-amber-400'>
+                        {assessmentGate.message}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}

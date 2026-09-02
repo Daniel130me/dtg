@@ -9,6 +9,7 @@ import { db } from "@/server/db/client";
 import {
   absoluteEmailUrl,
   buildAssignmentGradedEmail,
+  buildAssignmentReturnedEmail,
   buildCertificateIssuedEmail,
   buildDiscussionReplyEmail,
   buildEnrolmentConfirmedEmail,
@@ -52,6 +53,7 @@ import { purgeExpiredContactBodies } from "@/server/modules/support/contact.serv
 export const OUTBOX_TOPICS = {
   enrolmentConfirmed: "enrolment.confirmed",
   assignmentGraded: "assignment.graded",
+  assignmentReturned: "assignment.returned",
   certificateIssued: "certificate.issued",
   certificateRevoked: "certificate.revoked",
   courseCompleted: "course.completed",
@@ -121,6 +123,7 @@ export interface OutboxNotificationPlan {
 export type OutboxEmailPlan =
   | { to: string; template: "enrolmentConfirmed"; params: Parameters<typeof buildEnrolmentConfirmedEmail>[0] }
   | { to: string; template: "assignmentGraded"; params: Parameters<typeof buildAssignmentGradedEmail>[0] }
+  | { to: string; template: "assignmentReturned"; params: Parameters<typeof buildAssignmentReturnedEmail>[0] }
   | { to: string; template: "certificateIssued"; params: Parameters<typeof buildCertificateIssuedEmail>[0] }
   | { to: string; template: "discussionReply"; params: Parameters<typeof buildDiscussionReplyEmail>[0] }
   | { to: string; template: "reviewReply"; params: Parameters<typeof buildReviewReplyEmail>[0] };
@@ -137,6 +140,8 @@ export function renderOutboxEmail(email: OutboxEmailPlan): { subject: string; te
       return buildEnrolmentConfirmedEmail(email.params);
     case "assignmentGraded":
       return buildAssignmentGradedEmail(email.params);
+    case "assignmentReturned":
+      return buildAssignmentReturnedEmail(email.params);
     case "certificateIssued":
       return buildCertificateIssuedEmail(email.params);
     case "discussionReply":
@@ -169,6 +174,14 @@ const assignmentGradedPayloadSchema = z.object({
   score: z.number(),
   maxPoints: z.number(),
   scorePercent: z.number().optional(),
+});
+
+const assignmentReturnedPayloadSchema = z.object({
+  submissionId: z.string(),
+  assignmentId: z.string(),
+  courseId: z.string(),
+  studentUserId: z.uuid(),
+  feedback: z.string().min(1),
 });
 
 const certificateIssuedPayloadSchema = z.object({
@@ -270,6 +283,38 @@ export function planOutboxEvent(topic: string, payload: unknown, resolution: Out
                 score: data.score,
                 maxPoints: data.maxPoints,
                 feedback: resolution.gradeFeedback,
+              },
+            }
+          : undefined,
+      };
+    }
+
+    case OUTBOX_TOPICS.assignmentReturned: {
+      const data = assignmentReturnedPayloadSchema.parse(payload);
+      const linkPath = resolution.courseSlug
+        ? resolution.lessonId
+          ? `/learning/${resolution.courseSlug}/${resolution.lessonId}`
+          : `/learning/${resolution.courseSlug}`
+        : undefined;
+      return {
+        notifications: [
+          {
+            userId: data.studentUserId,
+            topic,
+            title: `Revision requested: ${resolution.lessonTitle ?? "your assignment"}`,
+            body: renderExcerpt(data.feedback),
+            linkPath,
+            dedupeKeySuffix: data.studentUserId,
+          },
+        ],
+        email: resolution.recipientEmail
+          ? {
+              to: resolution.recipientEmail,
+              template: "assignmentReturned",
+              params: {
+                courseTitle: resolution.courseTitle ?? "your course",
+                lessonTitle: resolution.lessonTitle ?? "your assignment",
+                feedback: data.feedback,
               },
             }
           : undefined,
@@ -473,6 +518,29 @@ async function resolveOutboxContext(event: OutboxEventRow): Promise<OutboxResolu
         lessonId: submission?.assignment.lesson.id,
         lessonTitle: submission?.assignment.lesson.title,
         gradeFeedback: grade?.feedback ?? undefined,
+        recipientEmail: contact.recipientEmail,
+        learnerName: contact.learnerName,
+      };
+    }
+
+    case OUTBOX_TOPICS.assignmentReturned: {
+      const parsed = assignmentReturnedPayloadSchema.safeParse(event.payload);
+      if (!parsed.success) return {};
+      // 3 parallel queries: submission -> assignment -> lesson for the deep
+      // link, the course for title/slug, and the recipient's contact.
+      const [submission, course, contact] = await Promise.all([
+        db.assignmentSubmission.findUnique({
+          where: { id: parsed.data.submissionId },
+          select: { assignment: { select: { lesson: { select: { id: true, title: true } } } } },
+        }),
+        db.course.findUnique({ where: { id: parsed.data.courseId }, select: { slug: true, title: true } }),
+        resolveUserContact(parsed.data.studentUserId),
+      ]);
+      return {
+        courseSlug: course?.slug,
+        courseTitle: course?.title,
+        lessonId: submission?.assignment.lesson.id,
+        lessonTitle: submission?.assignment.lesson.title,
         recipientEmail: contact.recipientEmail,
         learnerName: contact.learnerName,
       };

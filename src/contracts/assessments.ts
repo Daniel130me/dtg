@@ -46,6 +46,7 @@ export const ASSIGNMENT_DEADLINE_PASSED = "ASSIGNMENT_DEADLINE_PASSED";
 export const ASSIGNMENT_RESUBMISSION_NOT_ALLOWED = "ASSIGNMENT_RESUBMISSION_NOT_ALLOWED";
 export const SUBMISSION_NOT_FOUND = "SUBMISSION_NOT_FOUND";
 export const GRADE_SCORE_OUT_OF_RANGE = "GRADE_SCORE_OUT_OF_RANGE";
+export const SUBMISSION_NOT_RETURNABLE = "SUBMISSION_NOT_RETURNABLE";
 
 // ---------------------------------------------------------------------------
 // Query contracts
@@ -240,6 +241,9 @@ export const learnerSubmissionSchema = z.object({
       gradedAt: z.iso.datetime(),
     })
     .nullable(),
+  // Present when the owner returned this attempt for revision.
+  returnedFeedback: z.string().nullable(),
+  returnedAt: z.iso.datetime().nullable(),
 });
 
 export const assignmentLearnerViewSchema = z.object({
@@ -292,6 +296,8 @@ export const gradingDetailSchema = z.object({
     body: z.string(),
     attachmentUrl: z.string().nullable(),
     submittedAt: z.iso.datetime(),
+    returnedFeedback: z.string().nullable(),
+    returnedAt: z.iso.datetime().nullable(),
     student: gradingStudentSchema,
   }),
   assignment: z.object({
@@ -320,6 +326,11 @@ export const gradeCreateSchema = z.object({
   feedback: z.string().trim().max(GRADE_FEEDBACK_MAX).nullable(),
 });
 
+/** Body of POST /owner/grading/submissions/{submissionId}/return. */
+export const submissionReturnSchema = z.object({
+  feedback: z.string().trim().min(1).max(GRADE_FEEDBACK_MAX),
+});
+
 // ---------------------------------------------------------------------------
 // Path parameter schemas
 // ---------------------------------------------------------------------------
@@ -341,3 +352,4 @@ export type GradingQueueItemDto = z.infer<typeof gradingQueueItemSchema>;
 export type PaginatedGradingQueueDto = z.infer<typeof paginatedGradingQueueSchema>;
 export type GradingDetailDto = z.infer<typeof gradingDetailSchema>;
 export type GradeCreateInput = z.infer<typeof gradeCreateSchema>;
+export type SubmissionReturnInput = z.infer<typeof submissionReturnSchema>;

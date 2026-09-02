@@ -87,7 +87,16 @@ function buildPayload(questions: QuizQuestionDto[], answers: QuizAnswerMap): Qui
   };
 }
 
-export default function PlayerQuizPanel({ lessonId }: { lessonId: string }) {
+export interface PlayerQuizPanelProps {
+  lessonId: string;
+  /** Coursera-style completion gate: reported to the player so it can disable
+   *  "Mark as complete" until the quiz is passed (404/no-quiz => ungated). */
+  onGateChange?: (satisfied: boolean, message: string | null) => void;
+  /** Fired once per passing submit so the player can auto-complete the lesson. */
+  onComplete?: () => void;
+}
+
+export default function PlayerQuizPanel({ lessonId, onGateChange, onComplete }: PlayerQuizPanelProps) {
   const [view, setView] = useState<QuizLearnerViewDto | null>(null);
   const [activeAttempt, setActiveAttempt] = useState<QuizActiveAttemptDto | null>(null);
   const [result, setResult] = useState<QuizAttemptResultDto | null>(null);
@@ -120,12 +129,16 @@ export default function PlayerQuizPanel({ lessonId }: { lessonId: string }) {
         setView(dto);
         setActiveAttempt(dto.myState.activeAttempt);
         setResult(review);
+        // Gate report: a quiz lesson without an authored quiz never blocks
+        // completion (same convention as certificate eligibility).
+        onGateChange?.(dto.myState.passed, dto.myState.passed ? null : 'Pass the quiz to complete this lesson.');
         setLoadedKey(requestKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         if (err instanceof ApiClientError && err.status === 404 && err.code === QUIZ_NOT_CONFIGURED) {
           setNotConfigured(true);
+          onGateChange?.(true, null);
         } else if (
           err instanceof ApiClientError &&
           (err.code === COURSE_NOT_ENROLLED || err.status === 422 || err.status === 403)
@@ -197,6 +210,11 @@ export default function PlayerQuizPanel({ lessonId }: { lessonId: string }) {
     try {
       const submitted = await submitQuizAttempt(attempt.id, payload);
       toast.success('Attempt submitted');
+      // Coursera-style: a passing attempt completes the lesson automatically.
+      if (submitted.passed) {
+        onGateChange?.(true, null);
+        onComplete?.();
+      }
       // Resync myState (attempts left, best score) before showing the result;
       // if the resync fails, still show the fresh result from the submit call.
       const data = await loadViewData().catch(() => null);

@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   gradingQueueQuerySchema,
+  learnerSubmissionSchema,
   quizAttemptResultSchema,
   quizAuthoringInputSchema,
   quizLearnerViewSchema,
   quizSubmitSchema,
+  submissionReturnSchema,
+  GRADE_FEEDBACK_MAX,
 } from "@/contracts/assessments";
 import {
   buildAttemptResultQuestions,
@@ -546,5 +549,46 @@ describe("assessment wire contracts", () => {
     assert.equal(parsed.limit, 5);
     assert.equal(parsed.status, "SUBMITTED");
     assert.throws(() => gradingQueueQuerySchema.parse({ status: "PENDING" }));
+  });
+});
+
+describe("submission return flow contracts", () => {
+  it("accepts a feedback message within the grade-feedback bound", () => {
+    const parsed = submissionReturnSchema.parse({ feedback: "Please expand section 2 and resubmit." });
+    assert.equal(parsed.feedback, "Please expand section 2 and resubmit.");
+  });
+
+  it("rejects empty or oversized revision feedback", () => {
+    assert.throws(() => submissionReturnSchema.parse({ feedback: "   " }));
+    assert.throws(() => submissionReturnSchema.parse({ feedback: "x".repeat(GRADE_FEEDBACK_MAX + 1) }));
+  });
+
+  it("carries the returned fields on the learner submission DTO", () => {
+    const submission = learnerSubmissionSchema.parse({
+      id: "3f2504e0-4f89-11d3-9a0c-0305e82c3310",
+      attemptNumber: 1,
+      status: "RETURNED",
+      body: "First attempt",
+      attachmentUrl: null,
+      submittedAt: "2026-09-04T10:00:00.000Z",
+      latestGrade: null,
+      returnedFeedback: "Add your references.",
+      returnedAt: "2026-09-04T12:00:00.000Z",
+    });
+    assert.equal(submission.returnedFeedback, "Add your references.");
+    assert.equal(submission.returnedAt, "2026-09-04T12:00:00.000Z");
+
+    const plain = learnerSubmissionSchema.parse({
+      id: "3f2504e0-4f89-11d3-9a0c-0305e82c3311",
+      attemptNumber: 2,
+      status: "SUBMITTED",
+      body: "Second attempt",
+      attachmentUrl: null,
+      submittedAt: "2026-09-04T14:00:00.000Z",
+      latestGrade: null,
+      returnedFeedback: null,
+      returnedAt: null,
+    });
+    assert.equal(plain.returnedFeedback, null);
   });
 });

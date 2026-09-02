@@ -6,6 +6,7 @@ import type {
   PaginatedGradingQueueDto,
   QuizAuthoringDto,
   QuizAuthoringInput,
+  SubmissionReturnInput,
 } from "@/contracts/assessments";
 import type { z } from "zod";
 import { gradingQueueQuerySchema } from "@/contracts/assessments";
@@ -118,4 +119,15 @@ export function gradeSubmission(
     `${OWNER_API_BASE}/grading/submissions/${encodeURIComponent(submissionId)}/grade`,
     { method: "POST", body: JSON.stringify(input) },
   ).then(({ grade }) => grade);
+}
+
+/** POST /api/v1/owner/grading/submissions/{submissionId}/return — send back for revision. */
+export function returnSubmission(
+  submissionId: string,
+  input: SubmissionReturnInput,
+): Promise<GradingDetailDto["submission"]> {
+  return apiRequest<{ submission: GradingDetailDto["submission"] }>(
+    `${OWNER_API_BASE}/grading/submissions/${encodeURIComponent(submissionId)}/return`,
+    { method: "POST", body: JSON.stringify(input) },
+  ).then(({ submission }) => submission);
 }

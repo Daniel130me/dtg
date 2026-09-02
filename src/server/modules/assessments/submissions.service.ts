@@ -6,6 +6,7 @@ import {
   ASSIGNMENT_RESUBMISSION_NOT_ALLOWED,
   GRADE_SCORE_OUT_OF_RANGE,
   SUBMISSION_NOT_FOUND,
+  SUBMISSION_NOT_RETURNABLE,
   gradingQueueQuerySchema,
   type AssignmentLearnerViewDto,
   type GradeCreateInput,
@@ -13,6 +14,7 @@ import {
   type LearnerSubmissionDto,
   type PaginatedGradingQueueDto,
   type SubmissionCreateInput,
+  type SubmissionReturnInput,
 } from "@/contracts/assessments";
 import { COURSE_NOT_ENROLLED, LESSON_NOT_FOUND } from "@/contracts/learning";
 import { db } from "@/server/db/client";
@@ -64,6 +66,8 @@ function toLearnerSubmissionDto(row: {
   body: string;
   attachmentUrl: string | null;
   submittedAt: Date;
+  returnedFeedback: string | null;
+  returnedAt: Date | null;
   grades: { score: number; maxPoints: number; feedback: string | null; createdAt: Date }[];
 }): LearnerSubmissionDto {
   // The learner sees the latest grade row only (full history stays owner-side).
@@ -83,6 +87,8 @@ function toLearnerSubmissionDto(row: {
           gradedAt: latestGrade.createdAt.toISOString(),
         }
       : null,
+    returnedFeedback: row.returnedFeedback,
+    returnedAt: row.returnedAt?.toISOString() ?? null,
   };
 }
 
@@ -92,6 +98,8 @@ const LEARNER_SUBMISSION_SELECT = {
   status: true,
   body: true,
   attachmentUrl: true,
+  returnedFeedback: true,
+  returnedAt: true,
   submittedAt: true,
   grades: { orderBy: { createdAt: "desc" as const }, take: 1, select: { score: true, maxPoints: true, feedback: true, createdAt: true } },
 } satisfies Prisma.AssignmentSubmissionSelect;
@@ -401,6 +409,8 @@ export async function getGradingDetail(submissionId: string): Promise<GradingDet
       body: true,
       attachmentUrl: true,
       submittedAt: true,
+      returnedFeedback: true,
+      returnedAt: true,
       user: { select: { id: true, name: true, email: true } },
       assignment: {
         select: {
@@ -436,6 +446,8 @@ export async function getGradingDetail(submissionId: string): Promise<GradingDet
       body: row.body,
       attachmentUrl: row.attachmentUrl,
       submittedAt: row.submittedAt.toISOString(),
+      returnedFeedback: row.returnedFeedback,
+      returnedAt: row.returnedAt?.toISOString() ?? null,
       student: row.user,
     },
     assignment: {
@@ -569,4 +581,116 @@ export async function gradeSubmission(
       },
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Owner "return for revision"
+// ---------------------------------------------------------------------------
+
+/**
+ * Sends a submission back to the learner with feedback. Allowed from
+ * SUBMITTED (not yet graded) or GRADED (grade given, but the owner wants a
+ * revision); a RETURNED row cannot be returned again — the learner answers
+ * with a fresh attempt row instead. The learner can resubmit per the shared
+ * eligibility policy (RETURNED frees the "one open submission" slot).
+ *
+ * An `assignment.returned` outbox event fans out the in-app notification and
+ * the revision-request email (Phase 10 dispatcher).
+ *
+ * Query budget: 1 read + tx { guarded updateMany, audit, outbox }.
+ */
+export async function returnSubmission(
+  ownerId: string,
+  submissionId: string,
+  input: SubmissionReturnInput,
+  requestId: string,
+): Promise<{
+  submission: {
+    id: string;
+    status: SubmissionStatus;
+    returnedFeedback: string;
+    returnedAt: string;
+  };
+}> {
+  const submission = await db.assignmentSubmission.findUnique({
+    where: { id: submissionId },
+    select: { id: true, status: true, userId: true, assignmentId: true, courseId: true },
+  });
+  if (!submission) {
+    throw new ApiError(404, SUBMISSION_NOT_FOUND, "The submission was not found.");
+  }
+  if (submission.status === SubmissionStatus.RETURNED) {
+    throw new ApiError(
+      422,
+      SUBMISSION_NOT_RETURNABLE,
+      "This submission has already been returned for revision.",
+    );
+  }
+
+  const returnedAt = new Date();
+  await withTransaction(async (tx) => {
+    // The guarded updateMany is the concurrency gate: only a transition from
+    // SUBMITTED/GRADED wins, so a racing grade and return cannot both apply.
+    const flipped = await tx.assignmentSubmission.updateMany({
+      where: { id: submission.id, status: { in: [SubmissionStatus.SUBMITTED, SubmissionStatus.GRADED] } },
+      data: {
+        status: SubmissionStatus.RETURNED,
+        returnedFeedback: input.feedback,
+        returnedAt,
+      },
+    });
+    if (flipped.count !== 1) {
+      throw new ApiError(
+        422,
+        SUBMISSION_NOT_RETURNABLE,
+        "This submission has already been returned for revision.",
+      );
+    }
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: ownerId,
+        action: "grading.returned",
+        entityType: "AssignmentSubmission",
+        entityId: submission.id,
+        requestId,
+        metadata: {
+          assignmentId: submission.assignmentId,
+          courseId: submission.courseId,
+          studentUserId: submission.userId,
+        },
+      },
+      select: { id: true },
+    });
+
+    await tx.outboxEvent.create({
+      data: {
+        // A submission row can be returned more than once across its life
+        // (GRADED -> RETURNED -> re-graded -> RETURNED), so the eventKey
+        // carries the timestamp of THIS transition; the guarded updateMany
+        // above is what makes the side effect exactly-once.
+        eventKey: `assignment.returned:${submission.id}:${returnedAt.toISOString()}`,
+        topic: "assignment.returned",
+        aggregateType: "AssignmentSubmission",
+        aggregateId: submission.id,
+        payload: {
+          submissionId: submission.id,
+          assignmentId: submission.assignmentId,
+          courseId: submission.courseId,
+          studentUserId: submission.userId,
+          feedback: input.feedback,
+        },
+      },
+      select: { id: true },
+    });
+  });
+
+  return {
+    submission: {
+      id: submission.id,
+      status: SubmissionStatus.RETURNED,
+      returnedFeedback: input.feedback,
+      returnedAt: returnedAt.toISOString(),
+    },
+  };
 }

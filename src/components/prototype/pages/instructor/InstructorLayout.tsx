@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ClipboardCheck,
   MessageSquareQuote,
+  Award,
   LogOut,
 } from 'lucide-react';
 import { useNav } from '@/lib/prototype/navigation';
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', view: 'instructor-dashboard', icon: <LayoutDashboard className="size-5" /> },
   { label: 'Course Management', view: 'course-management', icon: <BookOpen className="size-5" /> },
   { label: 'Grading', view: 'grading', icon: <ClipboardCheck className="size-5" /> },
+  { label: 'Certificates', view: 'certificates-admin', icon: <Award className="size-5" /> },
   { label: 'Reviews', view: 'reviews', icon: <MessageSquareQuote className="size-5" /> },
   { label: 'Student Management', view: 'student-management', icon: <Users className="size-5" /> },
   { label: 'Analytics', view: 'analytics', icon: <BarChart3 className="size-5" /> },

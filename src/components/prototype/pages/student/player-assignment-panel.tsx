@@ -85,7 +85,16 @@ function parseAttachmentUrl(raw: string): { url: string | null; invalid: boolean
   }
 }
 
-export default function PlayerAssignmentPanel({ lessonId }: { lessonId: string }) {
+export interface PlayerAssignmentPanelProps {
+  lessonId: string;
+  /** Coursera-style completion gate: reported to the player so it can disable
+   *  "Mark as complete" until the assignment is submitted (404/none => ungated). */
+  onGateChange?: (satisfied: boolean, message: string | null) => void;
+  /** Fired once per successful submit so the player can auto-complete the lesson. */
+  onComplete?: () => void;
+}
+
+export default function PlayerAssignmentPanel({ lessonId, onGateChange, onComplete }: PlayerAssignmentPanelProps) {
   const [view, setView] = useState<AssignmentLearnerViewDto | null>(null);
   const [notConfigured, setNotConfigured] = useState(false);
   const [enrollGated, setEnrollGated] = useState(false);
@@ -109,6 +118,10 @@ export default function PlayerAssignmentPanel({ lessonId }: { lessonId: string }
       .then((dto) => {
         if (cancelled) return;
         setView(dto);
+        // Gate report: an assignment lesson without a configured assignment
+        // never blocks completion (same convention as certificate eligibility).
+        const submitted = dto.myState.submissions.length > 0;
+        onGateChange?.(submitted, submitted ? null : 'Submit the assignment to complete this lesson.');
         setLoadedKey(requestKey);
       })
       .catch((err: unknown) => {
@@ -119,6 +132,7 @@ export default function PlayerAssignmentPanel({ lessonId }: { lessonId: string }
           err.code === ASSIGNMENT_NOT_CONFIGURED
         ) {
           setNotConfigured(true);
+          onGateChange?.(true, null);
         } else if (
           err instanceof ApiClientError &&
           (err.code === COURSE_NOT_ENROLLED || err.status === 422 || err.status === 403)
@@ -158,7 +172,11 @@ export default function PlayerAssignmentPanel({ lessonId }: { lessonId: string }
       setBody('');
       setAttachmentUrl('');
       // Adopt the server's view so the history + canSubmit reflect reality.
-      setView(await fetchAssignmentLearnerView(lessonId));
+      const dto = await fetchAssignmentLearnerView(lessonId);
+      setView(dto);
+      // Coursera-style: submitting the assignment completes the lesson.
+      onGateChange?.(true, null);
+      onComplete?.();
     } catch (err: unknown) {
       toast.error(
         err instanceof ApiClientError ? err.message : 'Could not submit your assignment.',
@@ -295,7 +313,14 @@ export default function PlayerAssignmentPanel({ lessonId }: { lessonId: string }
       {latest?.status === 'RETURNED' && (
         <div className='flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200'>
           <Undo2 className='mt-0.5 size-4 shrink-0 text-amber-600' />
-          <p>The owner returned your submission — revise and resubmit.</p>
+          <div>
+            <p>The instructor returned your submission — revise and resubmit.</p>
+            {latest.returnedFeedback && (
+              <p className='mt-1 whitespace-pre-wrap rounded-md bg-amber-100/70 p-2 text-xs dark:bg-amber-900/40'>
+                “{latest.returnedFeedback}”
+              </p>
+            )}
+          </div>
         </div>
       )}
 

@@ -65,6 +65,46 @@ export const certificateRevokeSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Owner console contracts (list + revoke)
+// ---------------------------------------------------------------------------
+
+/** Bounded reads: page size for the owner certificate list. */
+export const OWNER_CERTIFICATES_LIMIT_DEFAULT = 20;
+export const OWNER_CERTIFICATES_LIMIT_MAX = 50;
+/** Search box bound (matches by learner name/email or certificate code). */
+export const OWNER_CERTIFICATES_SEARCH_MAX = 191;
+
+export const ownerCertificatesQuerySchema = z.object({
+  courseId: z.uuid().optional(),
+  status: z.enum(CERTIFICATE_STATUSES).optional(),
+  search: z.string().trim().max(OWNER_CERTIFICATES_SEARCH_MAX).optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OWNER_CERTIFICATES_LIMIT_MAX)
+    .default(OWNER_CERTIFICATES_LIMIT_DEFAULT),
+});
+
+export const ownerCertificateListItemSchema = z.object({
+  id: z.uuid(),
+  code: z.string(),
+  status: z.enum(CERTIFICATE_STATUSES),
+  issuedAt: z.iso.datetime(),
+  revokedAt: z.iso.datetime().nullable(),
+  revokedReason: z.string().nullable(),
+  learner: z.object({ id: z.uuid(), name: z.string(), email: z.string() }),
+  course: z.object({ id: z.uuid(), title: z.string(), slug: z.string() }),
+});
+
+export const paginatedOwnerCertificatesSchema = z.object({
+  items: z.array(ownerCertificateListItemSchema),
+  nextCursor: z.string().nullable(),
+  total: z.number().int().nonnegative(),
+});
+
+// ---------------------------------------------------------------------------
 // Path parameter schemas
 // ---------------------------------------------------------------------------
 
@@ -74,3 +114,6 @@ export const certificateCodeParamSchema = z.string().min(6).max(32);
 export type CertificateDto = z.infer<typeof certificateDtoSchema>;
 export type MyCertificatesDto = z.infer<typeof myCertificatesSchema>;
 export type PublicCertificateDto = z.infer<typeof publicCertificateSchema>;
+export type OwnerCertificatesQueryInput = z.input<typeof ownerCertificatesQuerySchema>;
+export type OwnerCertificateListItemDto = z.infer<typeof ownerCertificateListItemSchema>;
+export type PaginatedOwnerCertificatesDto = z.infer<typeof paginatedOwnerCertificatesSchema>;

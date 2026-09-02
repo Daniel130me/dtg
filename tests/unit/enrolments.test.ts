@@ -81,6 +81,7 @@ describe("enrolment wire contracts", () => {
     revokedAt: null,
     course,
     progress: null,
+    nextLesson: null,
   };
 
   it("parses a complete enrolment DTO with nullable dates and progress", () => {
@@ -94,10 +95,18 @@ describe("enrolment wire contracts", () => {
       revokedAt: null,
       course,
       progress: { completedLessons: 1, totalLessons: 4, progressPercent: 25 },
+      nextLesson: {
+        id: "3f2504e0-4f89-11d3-9a0c-0305e82c3303",
+        title: "Second lesson",
+        type: "VIDEO",
+        durationSeconds: 300,
+        isPreview: false,
+      },
     });
     assert.equal(parsed.course.categorySlug, "web-development");
     assert.equal(parsed.completedAt, null);
     assert.equal(parsed.progress?.progressPercent, 25);
+    assert.equal(parsed.nextLesson?.title, "Second lesson");
 
     // REVOKED enrolments carry no progress block.
     const revoked = enrolmentDtoSchema.parse({
@@ -124,6 +133,7 @@ describe("enrolment wire contracts", () => {
       revokedAt: null,
       course,
       progress: { completedLessons: 0, totalLessons: 4, progressPercent: 0 },
+      nextLesson: null,
     };
     const page = paginatedEnrolmentsSchema.parse({ items: [enrolment], nextCursor: null, total: 1 });
     assert.equal(page.total, 1);

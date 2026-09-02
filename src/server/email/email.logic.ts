@@ -208,6 +208,26 @@ export function buildAssignmentGradedEmail(input: {
   };
 }
 
+export function buildAssignmentReturnedEmail(input: {
+  courseTitle: string;
+  lessonTitle: string;
+  feedback: string;
+}): EmailContent {
+  return {
+    subject: sanitizeEmailSubject(`Revision requested: ${input.lessonTitle} — ${input.courseTitle}`),
+    text: `Your submission for "${input.lessonTitle}" in ${input.courseTitle} was returned for revision.\n\nInstructor feedback: ${input.feedback}\n\nRevise and resubmit from your classroom.`,
+    html: renderEmailLayout({
+      heading: "Revision requested",
+      bodyHtml:
+        paragraph(
+          `Your submission for "${input.lessonTitle}" in ${input.courseTitle} was returned for revision.`,
+        ) +
+        paragraph(`Instructor feedback: ${input.feedback}`) +
+        paragraph("Revise and resubmit from your classroom."),
+    }),
+  };
+}
+
 export function buildCertificateIssuedEmail(input: {
   courseTitle: string;
   verifyUrl: string;

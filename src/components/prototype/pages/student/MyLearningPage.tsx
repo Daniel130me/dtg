@@ -133,7 +133,8 @@ interface EnrolmentCardProps {
   index: number;
 }
 
-/** The player arrives in Phase 8 — for now the course page is the honest destination. */
+/** "Continue" deep-links into the classroom's next lesson; finished or
+ *  revoked enrolments fall back to the course page. */
 function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
   const course = enrolment.course;
   const gradient = categoryGradients[course.categorySlug] ?? DEFAULT_GRADIENT;
@@ -142,6 +143,9 @@ function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
   // Fully-watched courses switch the card's primary action from resuming to
   // reviewing (the link target stays the course page either way).
   const courseCompleted = progress?.progressPercent === 100;
+  const cardHref = enrolment.nextLesson
+    ? `/learning/${encodeURIComponent(course.slug)}/${encodeURIComponent(enrolment.nextLesson.id)}`
+    : `/courses/${course.slug}`;
 
   return (
     <motion.div
@@ -151,7 +155,7 @@ function EnrolmentCard({ enrolment, index }: EnrolmentCardProps) {
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
     >
       <Link
-        href={`/courses/${course.slug}`}
+        href={cardHref}
         className='block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
       >
         <Card className='group h-full cursor-pointer overflow-hidden p-0 gap-0 transition-shadow duration-300 hover:shadow-lg hover:shadow-primary/5'>
