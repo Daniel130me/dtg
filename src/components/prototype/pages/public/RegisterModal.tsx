@@ -23,18 +23,32 @@ export default function RegisterModal() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setMessage(null);
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
     setPending(true);
-    const result = await authClient.signUp.email({ name: name.trim(), email, password });
-    setPending(false);
-    if (result.error) {
-      setError('Unable to create the account. Check the information and try again.');
-      return;
+    try {
+      const result = await authClient.signUp.email({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (result.error) {
+        setError('Unable to create the account. Check the information and try again.');
+        return;
+      }
+      // Better Auth intentionally gives the same response for new and existing
+      // addresses so the public form cannot be used to discover student accounts.
+      setMessage(
+        'Check your email for the next step. New accounts receive a verification link; existing accounts receive sign-in guidance.',
+      );
+    } catch {
+      setError('Unable to reach the registration service. Please try again.');
+    } finally {
+      setPending(false);
     }
-    setMessage('Account created. Check your email to verify it before signing in.');
   };
 
   return (

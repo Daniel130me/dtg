@@ -72,6 +72,16 @@ export function createAuthService(
       maxPasswordLength: PASSWORD_MAX_LENGTH,
       password: { hash: hashPassword, verify: verifyPassword },
       revokeSessionsOnPasswordReset: true,
+      onExistingUserSignUp: async ({ user }) => {
+        await sendEmailSafely({
+          to: user.email,
+          subject: "Your DTG account already exists",
+          intro:
+            "Someone tried to register with this email address, but it is already linked to a DTG account. You can sign in with your existing password or reset it if needed.",
+          actionLabel: "Sign in to DTG",
+          actionUrl: `${env.APP_URL}/login`,
+        });
+      },
       onPasswordReset: async ({ user }) => {
         await database.auditLog.create({
           data: {
