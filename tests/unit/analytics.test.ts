@@ -85,14 +85,21 @@ describe("completion rate", () => {
 });
 
 describe("primary currency", () => {
-  it("falls back to USD when no payment ever succeeded", () => {
-    assert.equal(pickPrimaryCurrency([]), "USD");
+  it("falls back to NGN (the launch currency) when no payment ever succeeded", () => {
+    assert.equal(pickPrimaryCurrency([]), "NGN");
   });
 
   it("picks the highest-volume currency regardless of row order", () => {
     assert.equal(
+      pickPrimaryCurrency([{ currency: "EUR" }, { currency: "NGN" }, { currency: "NGN" }, { currency: "NGN" }]),
+      "NGN",
+    );
+  });
+
+  it("normalizes legacy USD rows into NGN before counting", () => {
+    assert.equal(
       pickPrimaryCurrency([{ currency: "EUR" }, { currency: "USD" }, { currency: "USD" }, { currency: "USD" }]),
-      "USD",
+      "NGN",
     );
   });
 
@@ -106,12 +113,12 @@ describe("revenue totals", () => {
   it("excludes rows in non-primary currencies from gross and refunds", () => {
     const totals = sumRevenue(
       [
-        { amountMinor: 1000, currency: "USD" },
+        { amountMinor: 1000, currency: "NGN" },
         { amountMinor: 2500, currency: "USD" },
         { amountMinor: 9999, currency: "EUR" },
       ],
       [{ amountMinor: 500, currency: "EUR" }],
-      "USD",
+      "NGN",
     );
     assert.deepEqual(totals, { grossRevenueMinor: 3500, refundedMinor: 0, netRevenueMinor: 3500 });
   });
@@ -119,11 +126,11 @@ describe("revenue totals", () => {
   it("subtracts primary-currency refunds from gross (net = gross - refunded)", () => {
     const totals = sumRevenue(
       [
-        { amountMinor: 1000, currency: "USD" },
+        { amountMinor: 1000, currency: "NGN" },
         { amountMinor: 2500, currency: "USD" },
       ],
-      [{ amountMinor: 700, currency: "USD" }],
-      "USD",
+      [{ amountMinor: 700, currency: "NGN" }],
+      "NGN",
     );
     assert.deepEqual(totals, { grossRevenueMinor: 3500, refundedMinor: 700, netRevenueMinor: 2800 });
   });
@@ -131,8 +138,8 @@ describe("revenue totals", () => {
   it("never clamps a negative net", () => {
     const totals = sumRevenue(
       [{ amountMinor: 3500, currency: "USD" }],
-      [{ amountMinor: 4000, currency: "USD" }],
-      "USD",
+      [{ amountMinor: 4000, currency: "NGN" }],
+      "NGN",
     );
     assert.equal(totals.netRevenueMinor, -500);
   });

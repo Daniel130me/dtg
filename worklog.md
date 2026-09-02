@@ -910,3 +910,21 @@ Stage Summary:
 - Preview runtime restored end to end; the "z logo only" symptom was the dead upstream, not an app defect
 - Sandbox survival rules learned twice now: (1) processes must be started detached ((cmd &) subshell pattern), (2) anything the next session needs must live inside /home/z/my-project - hence .local-postgres/ + scripts/sandbox-db.sh + the gitignored runtime dir
 - Recovery recipe for a fresh sandbox: bash scripts/sandbox-db.sh && bun run db:migrate:deploy && bunx tsx prisma/seed.ts (+ owner bootstrap if the user table is empty), then (export DATABASE_URL=...; bun run dev > dev.log 2>&1 &)
+
+---
+Task ID: 13-a (coordinator)
+Agent: main-coordinator
+Task: Pull the externally-pushed media/NGN wave, restore the sandbox runtime (wiped again), and repair the stale analytics tests + metrics doc the wave left behind
+
+Work Log:
+- Pulled 11 new commits from origin (0ac7607..1805cd1, +4255/-392 across 67 files): R2 storage module (src/server/storage/r2.ts) + multipart lecture uploads + lesson-video service + upload UI controls, owner-managed catalog options + preview dialogs, StudentDataProvider, auth registration/owner-registration/email fixes, and the USD->NGN currency migration across UI
+- Sandbox had wiped the runtime AGAIN (even the gitignored .local-postgres/ inside the project - untracked dirs do not survive session recycling) and reverted .env; scripts/sandbox-db.sh handled the full restore in one command (install/init/start/createdb/env-repair), then: 3 new migrations applied clean (course_media_authoring, lesson_video_uploads, currency_ngn), owner re-bootstrapped, seed re-run
+- Hit and fixed a stale-Prisma-client trap: seed failed "Invalid value for argument level. Expected CourseLevel" - the DB was already varchar (new schema) but node_modules/.prisma predated the pull; `bun run db:generate` fixed it. Lesson: after pulling schema changes, ALWAYS regenerate the client before seeding
+- bun install picked up the newly-declared @aws-sdk/client-s3 + s3-request-presigner + server-only deps
+- Quality gates found real defects in the incoming wave: (1) typecheck failed until deps were installed (expected), (2) 5 analytics unit tests failed because commit 77c3dd6 changed pickPrimaryCurrency (USD rows normalize into NGN, default NGN) and sumRevenue (normalizePlatformCurrency filter) WITHOUT updating tests/unit/analytics.test.ts - updated the 5 tests to the new documented behavior and ADDED a normalization test (legacy USD rows count as NGN); (3) docs/ANALYTICS_METRICS.md still said "USD at launch" - updated to NGN with the normalization rule documented
+- Verified live after the fixes: lint 0, tsc 0, 346/346 tests (was 331 - the wave added 15), dev server healthy, owner login -> dashboard shows NGN (814.81 with naira sign, banknote icon, NGN axis ticks), public catalog shows only naira prices (no $ left), course detail page renders with Enroll + curriculum
+
+Stage Summary:
+- The pulled media/NGN wave is now green and verified in the browser; the repo's docs+tests are consistent with the NGN normalization behavior its own code documents
+- Reconfirmed sandbox behavior: gitignored dirs are wiped EVERY session - sandbox-db.sh + the (.env) repair path are now the standard first step; Prisma client regeneration added to the post-pull checklist
+- Pending from the wave (not regressions, just noted): R2 upload flow still needs real R2 credentials to exercise (env vars R2_S3_ENDPOINT/R2_PUBLIC_BASE_URL are optional-at-boot by design); 12-g's recovery recipe remains accurate with sandbox-db.sh as step 1
