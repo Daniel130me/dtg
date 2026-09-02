@@ -186,7 +186,7 @@ export default function NotificationsPage() {
             <Button
               variant='ghost'
               size='sm'
-              className='gap-1.5 -ml-2 text-muted-foreground hover:text-foreground'
+              className='min-h-11 gap-1.5 -ml-2 text-muted-foreground hover:text-foreground'
               onClick={() => router.back()}
             >
               <ArrowLeft className='size-4' aria-hidden /> Back
@@ -202,7 +202,7 @@ export default function NotificationsPage() {
             <Button
               variant='outline'
               size='sm'
-              className='gap-1.5 shrink-0'
+              className='min-h-11 gap-1.5 shrink-0'
               onClick={() => void handleMarkAllRead()}
               disabled={markAllPending}
             >
@@ -272,7 +272,12 @@ export default function NotificationsPage() {
                 <ul className='divide-y'>
                   {items.map((notification) => (
                     <li key={notification.id}>
-                      <NotificationRow notification={notification} onOpen={handleOpenNotification} />
+                      {/* py-4: full-row tap height on touch surfaces */}
+                      <NotificationRow
+                        notification={notification}
+                        onOpen={handleOpenNotification}
+                        className='py-4'
+                      />
                     </li>
                   ))}
                 </ul>

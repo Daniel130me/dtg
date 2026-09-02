@@ -221,12 +221,13 @@ function OwnerReviewCard({ review, onPatched }: OwnerReviewCardProps) {
                 <Button
                   variant='ghost'
                   size='sm'
+                  className='min-h-11 sm:min-h-8'
                   onClick={() => setReplyOpen(false)}
                   disabled={pendingAction !== null}
                 >
                   Cancel
                 </Button>
-                <Button size='sm' onClick={() => void handleSaveReply()} disabled={pendingAction !== null || replyDraft.trim().length === 0}>
+                <Button size='sm' className='min-h-11 sm:min-h-8' onClick={() => void handleSaveReply()} disabled={pendingAction !== null || replyDraft.trim().length === 0}>
                   {pendingAction === 'reply' && <Loader2 className='size-4 animate-spin' aria-hidden />}
                   Save reply
                 </Button>
@@ -237,7 +238,7 @@ function OwnerReviewCard({ review, onPatched }: OwnerReviewCardProps) {
               <Button
                 variant='outline'
                 size='sm'
-                className='gap-1.5'
+                className='gap-1.5 min-h-11 sm:min-h-8'
                 onClick={() => void handleModerate()}
                 disabled={pendingAction !== null}
               >
@@ -253,7 +254,7 @@ function OwnerReviewCard({ review, onPatched }: OwnerReviewCardProps) {
               <Button
                 variant={review.reply === null ? 'default' : 'secondary'}
                 size='sm'
-                className='gap-1.5'
+                className='gap-1.5 min-h-11 sm:min-h-8'
                 onClick={openReplyEditor}
                 disabled={pendingAction !== null}
               >
@@ -369,7 +370,7 @@ export default function ReviewsModerationPage() {
               value={statusFilter}
               onValueChange={(value) => setStatusFilter(value as StatusFilter)}
             >
-              <SelectTrigger className='w-full sm:w-48' aria-label='Filter by status'>
+              <SelectTrigger className='w-full sm:w-48 min-h-11 sm:min-h-9' aria-label='Filter by status'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

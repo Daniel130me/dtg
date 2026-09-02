@@ -282,7 +282,8 @@ export default function GradingQueuePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto custom-scrollbar">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -346,6 +347,48 @@ export default function GradingQueuePage() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  {/* Mobile card list — each card opens the grading sheet */}
+                  <div className="md:hidden space-y-3">
+                    {items.map((entry) => (
+                      <div
+                        key={entry.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open submission from ${entry.student.name} on ${entry.lessonTitle}`}
+                        onClick={() => setDetailSubmissionId(entry.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setDetailSubmissionId(entry.id);
+                          }
+                        }}
+                        className="w-full text-left rounded-xl border bg-card p-4 space-y-3 cursor-pointer transition-colors hover:bg-muted/30 active:bg-muted/50"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{entry.student.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{entry.student.email}</p>
+                          </div>
+                          <Badge className={SUBMISSION_STATUS_BADGES[entry.status].className}>
+                            {SUBMISSION_STATUS_BADGES[entry.status].label}
+                          </Badge>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{entry.lessonTitle}</p>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{entry.courseTitle}</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>
+                            Attempt #{entry.attemptNumber} · {formatDate(entry.submittedAt)}
+                          </span>
+                          <span className="text-sm font-medium tabular-nums text-foreground">
+                            {entry.latestScore === null ? '—' : `${entry.latestScore}/${entry.maxPoints}`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {nextCursor && (

@@ -436,16 +436,16 @@ export default function AnalyticsPage() {
               {/* Charts Row */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Enrolment Growth */}
-                <motion.div variants={item} className="xl:col-span-2">
-                  <Card>
+                <motion.div variants={item} className="min-w-0 w-full xl:col-span-2">
+                  <Card className="min-w-0 w-full overflow-hidden">
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-base font-semibold">Enrolment Growth</CardTitle>
                         <Badge variant="secondary" className="text-xs">Last 6 Months</Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="h-[280px] sm:h-[300px] w-full">
+                    <CardContent className="pt-0 min-w-0 w-full">
+                      <div className="h-[280px] sm:h-[300px] w-full min-w-0 overflow-hidden">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={trendData} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
                             <defs>
@@ -490,12 +490,12 @@ export default function AnalyticsPage() {
                 </motion.div>
 
                 {/* Completion Donut (honest null state when there is no denominator) */}
-                <motion.div variants={item}>
-                  <Card className="h-full">
+                <motion.div variants={item} className="min-w-0 w-full">
+                  <Card className="h-full min-w-0 w-full overflow-hidden">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base font-semibold">Completion Rate</CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-0 flex flex-col items-center justify-center">
+                    <CardContent className="pt-0 min-w-0 w-full flex flex-col items-center justify-center">
                       {completionRate === null ? (
                         <div className="py-16 text-center">
                           <p className="text-4xl font-bold">—</p>
@@ -503,7 +503,7 @@ export default function AnalyticsPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="h-[200px] w-full">
+                          <div className="h-[200px] w-full min-w-0 overflow-hidden">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie
@@ -553,21 +553,21 @@ export default function AnalyticsPage() {
               </div>
 
               {/* Revenue by Course */}
-              <motion.div variants={item}>
-                <Card>
+              <motion.div variants={item} className="min-w-0 w-full">
+                <Card className="min-w-0 w-full overflow-hidden">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="text-base font-semibold">Course Revenue</CardTitle>
                       <Badge variant="secondary" className="text-xs">Top {analytics.courses.length || 0} Courses</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 min-w-0 w-full">
                     {revenueData.length === 0 ? (
                       <p className="py-16 text-center text-sm text-muted-foreground">
                         No enrolments yet — revenue appears once learners enrol.
                       </p>
                     ) : (
-                      <div className="h-[280px] w-full">
+                      <div className="h-[280px] w-full min-w-0 overflow-hidden">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={revenueData} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />

@@ -2,15 +2,17 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Search, SlidersHorizontal } from 'lucide-react';
+import { Loader2, Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import CourseCard from '@/components/prototype/shared/CourseCard';
 import { CourseCardSkeleton, FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { fetchCategories, fetchCourses, type CourseListQueryInput } from '@/features/catalog/api';
 import { formatLevel } from '@/lib/client/format';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   COURSE_PAGE_LIMIT_DEFAULT,
   COURSE_PRICE_FILTERS,
@@ -197,7 +199,128 @@ function CoursesPageContent() {
     updateParams({ search: undefined, category: undefined, level: undefined, price: undefined });
   }, [updateParams]);
 
+  const isMobile = useIsMobile();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const activeCategoryName = (categories ?? []).find((c) => c.slug === urlCategory)?.name;
+
+  // Active non-sort filters, derived from the same URL state that drives the
+  // query — the mobile chips and the Filters badge are pure projections.
+  const activeFilters = useMemo(() => {
+    const chips: { key: string; label: string; clear: () => void }[] = [];
+    if (urlSearch) {
+      chips.push({
+        key: 'search',
+        label: `Search: ${urlSearch}`,
+        clear: () => {
+          setSearchInput('');
+          updateParams({ search: undefined });
+        },
+      });
+    }
+    if (activeCategoryName) {
+      chips.push({ key: 'category', label: activeCategoryName, clear: () => updateParams({ category: undefined }) });
+    }
+    if (urlLevel) {
+      chips.push({ key: 'level', label: formatLevel(urlLevel), clear: () => updateParams({ level: undefined }) });
+    }
+    if (urlPrice) {
+      chips.push({ key: 'price', label: urlPrice === 'FREE' ? 'Free' : 'Paid', clear: () => updateParams({ price: undefined }) });
+    }
+    return chips;
+  }, [urlSearch, activeCategoryName, urlLevel, urlPrice, updateParams]);
+  const activeFilterCount = activeFilters.length;
+
+  // --- Shared filter controls ----------------------------------------------
+  // The SAME state drives both layouts: the desktop inline bar and the mobile
+  // vaul drawer render the same elements (Radix elements are reusable
+  // descriptors), so query semantics never diverge.
+  const categoryPills = (
+    <>
+      <button
+        onClick={() => updateParams({ category: undefined })}
+        className={`inline-flex min-h-11 items-center px-4 rounded-full text-sm font-medium transition-colors ${
+          urlCategory === ''
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-muted-foreground hover:bg-accent'
+        }`}
+      >
+        All Courses
+      </button>
+      {categoriesLoading
+        ? Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className='h-11 w-32 rounded-full' />
+          ))
+        : (categories ?? []).map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => updateParams({ category: cat.slug })}
+              className={`inline-flex min-h-11 items-center px-4 rounded-full text-sm font-medium transition-colors ${
+                urlCategory === cat.slug
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+      {categoriesError && (
+        <button
+          onClick={() => setCategoriesRetrySeed((s) => s + 1)}
+          className='inline-flex min-h-11 items-center px-4 rounded-full text-sm font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors'
+        >
+          Couldn&apos;t load categories — retry
+        </button>
+      )}
+    </>
+  );
+
+  const levelSelect = (
+    <Select
+      value={urlLevel ?? SENTINEL_ALL}
+      onValueChange={(value) => updateParams({ level: value === SENTINEL_ALL ? undefined : value })}
+    >
+      <SelectTrigger className='w-full sm:w-40 h-11 md:h-10' aria-label='Level filter'>
+        <SelectValue placeholder='Level' />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SENTINEL_ALL}>All Levels</SelectItem>
+        {['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].map((level) => (
+          <SelectItem key={level} value={level}>{formatLevel(level)}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const priceSelect = (
+    <Select
+      value={urlPriceRaw ?? SENTINEL_ALL}
+      onValueChange={(value) => updateParams({ price: value === SENTINEL_ALL ? undefined : value })}
+    >
+      <SelectTrigger className='w-full sm:w-36 h-11 md:h-10' aria-label='Price filter'>
+        <SelectValue placeholder='Price' />
+      </SelectTrigger>
+      <SelectContent>
+        {priceOptions.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  const sortSelect = (
+    <Select value={urlSort} onValueChange={(value) => updateParams({ sort: value === DEFAULT_SORT ? undefined : value })}>
+      <SelectTrigger className='w-full sm:w-48 h-11 md:h-10' aria-label='Sort courses'>
+        <SlidersHorizontal className='size-4 mr-1.5' />
+        <SelectValue placeholder='Sort by' />
+      </SelectTrigger>
+      <SelectContent>
+        {sortOptions.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 
   return (
     <main className='flex-1'>
@@ -209,9 +332,111 @@ function CoursesPageContent() {
         </div>
       </section>
 
+      {/* Sticky mobile action row: search + Filters entry point (md:hidden).
+          Sits flush under the sticky header (h-16 + safe-area inset). */}
+      <div
+        className='md:hidden sticky z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b'
+        style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))' }}
+      >
+        <div className='flex items-center gap-2 px-4 py-2.5'>
+          <div className='relative flex-1'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground' />
+            <Input
+              type='search'
+              placeholder='Search courses...'
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className='pl-9 h-11'
+            />
+          </div>
+          <Button
+            variant='outline'
+            onClick={() => setFiltersOpen(true)}
+            className='min-h-11 shrink-0 gap-1.5 px-3'
+            aria-label={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
+          >
+            <SlidersHorizontal className='size-4' />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className='inline-flex min-w-5 size-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold leading-none text-primary-foreground'>
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        </div>
+        {/* Removable active-filter chips (mobile only; the desktop bar shows every filter inline) */}
+        {activeFilters.length > 0 && (
+          <div className='flex items-center gap-2 overflow-x-auto px-4 pb-2.5'>
+            {activeFilters.map((chip) => (
+              <button
+                key={chip.key}
+                onClick={chip.clear}
+                className='inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-muted pl-3 pr-2 text-xs font-medium text-foreground transition-colors hover:bg-accent'
+                aria-label={`Remove filter: ${chip.label}`}
+              >
+                {chip.label}
+                <X className='size-3.5 text-muted-foreground' />
+              </button>
+            ))}
+            <button
+              onClick={clearFilters}
+              className='inline-flex min-h-8 shrink-0 items-center px-2 text-xs font-semibold text-primary transition-colors hover:text-primary/80'
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile filters drawer (vaul): same state as the desktop inline bar. */}
+      {isMobile && (
+        <Drawer direction='bottom' open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <DrawerContent className='max-h-[85vh]'>
+            <DrawerHeader className='text-left'>
+              <DrawerTitle>Filters</DrawerTitle>
+              <DrawerDescription>Refine the {total} published course{total === 1 ? '' : 's'}.</DrawerDescription>
+            </DrawerHeader>
+            <div className='overflow-y-auto px-4 pb-2 space-y-5'>
+              <div>
+                <p className='text-sm font-medium mb-2'>Category</p>
+                <div className='flex flex-wrap gap-2'>{categoryPills}</div>
+              </div>
+              <div className='space-y-4'>
+                <div>
+                  <p className='text-sm font-medium mb-1.5'>Level</p>
+                  {levelSelect}
+                </div>
+                <div>
+                  <p className='text-sm font-medium mb-1.5'>Price</p>
+                  {priceSelect}
+                </div>
+                <div>
+                  <p className='text-sm font-medium mb-1.5'>Sort by</p>
+                  {sortSelect}
+                </div>
+              </div>
+            </div>
+            <DrawerFooter className='flex-row gap-2 pb-[max(1rem,env(safe-area-inset-bottom,0px))]'>
+              <Button
+                variant='outline'
+                className='min-h-11 flex-1'
+                onClick={clearFilters}
+                disabled={activeFilterCount === 0}
+              >
+                Clear all
+              </Button>
+              <Button className='min-h-11 flex-[2]' onClick={() => setFiltersOpen(false)}>
+                Show results
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
+
       <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
-        {/* Search & Filters */}
-        <div className='flex flex-col sm:flex-row gap-4 mb-6'>
+        {/* Search & Filters — desktop keeps the inline bar exactly as before
+            (mobile uses the sticky row + drawer above). */}
+        <div className='hidden md:flex flex-row gap-4 mb-6'>
           <div className='relative flex-1'>
             <Search className='absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground' />
             <Input
@@ -221,83 +446,15 @@ function CoursesPageContent() {
               className='pl-9 h-10'
             />
           </div>
-          <Select
-            value={urlLevel ?? SENTINEL_ALL}
-            onValueChange={(value) => updateParams({ level: value === SENTINEL_ALL ? undefined : value })}
-          >
-            <SelectTrigger className='w-full sm:w-40'>
-              <SelectValue placeholder='Level' />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={SENTINEL_ALL}>All Levels</SelectItem>
-              {['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].map((level) => (
-                <SelectItem key={level} value={level}>{formatLevel(level)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={urlPriceRaw ?? SENTINEL_ALL}
-            onValueChange={(value) => updateParams({ price: value === SENTINEL_ALL ? undefined : value })}
-          >
-            <SelectTrigger className='w-full sm:w-36'>
-              <SelectValue placeholder='Price' />
-            </SelectTrigger>
-            <SelectContent>
-              {priceOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={urlSort} onValueChange={(value) => updateParams({ sort: value === DEFAULT_SORT ? undefined : value })}>
-            <SelectTrigger className='w-full sm:w-48'>
-              <SlidersHorizontal className='size-4 mr-1.5' />
-              <SelectValue placeholder='Sort by' />
-            </SelectTrigger>
-            <SelectContent>
-              {sortOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {levelSelect}
+          {priceSelect}
+          {sortSelect}
         </div>
 
-        {/* Category Pills (real categories from the API) */}
-        <div className='flex flex-wrap gap-2 mb-8'>
-          <button
-            onClick={() => updateParams({ category: undefined })}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              urlCategory === ''
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            All Courses
-          </button>
-          {categoriesLoading
-            ? Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className='h-9 w-32 rounded-full' />
-              ))
-            : (categories ?? []).map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => updateParams({ category: cat.slug })}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    urlCategory === cat.slug
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-accent'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
-          {categoriesError && (
-            <button
-              onClick={() => setCategoriesRetrySeed((s) => s + 1)}
-              className='px-4 py-2 rounded-full text-sm font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors'
-            >
-              Couldn&apos;t load categories — retry
-            </button>
-          )}
+        {/* Category Pills (real categories from the API) — desktop; mobile
+            gets the same pills inside the filters drawer. */}
+        <div className='hidden md:flex flex-wrap gap-2 mb-8'>
+          {categoryPills}
         </div>
 
         {/* Results Count */}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 import CourseCard from '@/components/prototype/shared/CourseCard';
 import { CourseCardSkeleton, FetchErrorState } from '@/components/prototype/shared/AsyncStates';
 import { useNav } from '@/lib/prototype/navigation';
@@ -143,7 +144,7 @@ export default function HomePage() {
   }, [categoriesKey]);
 
   return (
-    <main className='flex-1'>
+    <main className='flex-1 overflow-x-clip'>
       {/* Hero Section */}
       <section className='relative overflow-hidden'>
         <div className='absolute inset-0 bg-gradient-to-br from-[#0a1a3e] via-[#0f2847] to-[#162d50]' />
@@ -171,10 +172,10 @@ export default function HomePage() {
               Build real-world projects, learn from industry experts, and accelerate your tech career with our comprehensive, hands-on courses.
             </p>
             <div className='flex flex-col sm:flex-row gap-3'>
-              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
+              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8 min-h-12 w-full sm:w-auto active:scale-[0.98]' onClick={() => navigate('courses')}>
                 Browse Courses <ArrowRight className='ml-1.5 size-4' />
               </Button>
-              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8' onClick={() => navigate('about')}>
+              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8 min-h-12 w-full sm:w-auto active:scale-[0.98]' onClick={() => navigate('about')}>
                 Learn More
               </Button>
             </div>
@@ -240,19 +241,41 @@ export default function HomePage() {
               onRetry={() => setFeaturedRetrySeed((s) => s + 1)}
             />
           ) : featured && featured.items.length > 0 ? (
-            <motion.div
-              initial='hidden'
-              whileInView='visible'
-              viewport={{ once: true, margin: '-50px' }}
-              variants={staggerContainer}
-              className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            >
-              {featured.items.map((course) => (
-                <motion.div key={course.id} variants={fadeInUp}>
-                  <CourseCard course={course} />
-                </motion.div>
-              ))}
-            </motion.div>
+            <>
+              {/* Mobile: embla swipe rail (same CourseCard rendering as the grid) */}
+              <motion.div
+                initial='hidden'
+                whileInView='visible'
+                viewport={{ once: true, margin: '-50px' }}
+                variants={fadeInUp}
+                className='md:hidden'
+              >
+                <Carousel opts={{ align: 'start' }} className='w-full'>
+                  <CarouselContent>
+                    {featured.items.map((course) => (
+                      <CarouselItem key={course.id} className='basis-[85%]'>
+                        <CourseCard course={course} />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                </Carousel>
+              </motion.div>
+
+              {/* Desktop (md+): staggered grid — unchanged */}
+              <motion.div
+                initial='hidden'
+                whileInView='visible'
+                viewport={{ once: true, margin: '-50px' }}
+                variants={staggerContainer}
+                className='hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6'
+              >
+                {featured.items.map((course) => (
+                  <motion.div key={course.id} variants={fadeInUp}>
+                    <CourseCard course={course} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </>
           ) : (
             <p className='text-center text-muted-foreground py-8'>
               No courses have been published yet — check back soon.
@@ -504,10 +527,10 @@ export default function HomePage() {
               Join thousands of students who are already building the future with DTG. Your next career move starts here.
             </p>
             <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8' onClick={() => navigate('courses')}>
+              <Button size='lg' className='bg-white text-[#0a1a3e] hover:bg-white/90 font-semibold text-base px-8 min-h-12 w-full sm:w-auto active:scale-[0.98]' onClick={() => navigate('courses')}>
                 Explore Courses <ArrowRight className='ml-1.5 size-4' />
               </Button>
-              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8' onClick={() => navigate('register')}>
+              <Button size='lg' variant='outline' className='border-[#3b82f6]/30 text-[#93c5fd] hover:bg-[#1e3a8a]/50 text-base px-8 min-h-12 w-full sm:w-auto active:scale-[0.98]' onClick={() => navigate('register')}>
                 Create Free Account
               </Button>
             </div>

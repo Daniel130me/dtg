@@ -272,6 +272,77 @@ export default function CourseManagement() {
     [courses],
   );
 
+  // Shared row actions menu (used by the desktop table row and the mobile
+  // card footer so both layouts offer identical actions).
+  const renderCourseActions = (course: OwnerCourseListItemDto, triggerClassName: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={triggerClassName}
+          disabled={pendingId === course.id}
+        >
+          {pendingId === course.id ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <MoreHorizontal className="size-4" />
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem
+          className="gap-2 cursor-pointer"
+          onSelect={() => router.push(`/owner/courses/${course.id}`)}
+        >
+          <Pencil className="size-4" /> Edit
+        </DropdownMenuItem>
+        {course.status === 'PUBLISHED' && (
+          <DropdownMenuItem className="gap-2 cursor-pointer" asChild>
+            <a href={`/courses/${course.slug}`} target="_blank" rel="noreferrer">
+              <Eye className="size-4" /> View public page
+            </a>
+          </DropdownMenuItem>
+        )}
+        {course.status === 'DRAFT' && (
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onSelect={() => setConfirm({ action: 'publish', course })}
+          >
+            <Rocket className="size-4" /> Publish
+          </DropdownMenuItem>
+        )}
+        {course.status === 'PUBLISHED' && (
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onSelect={() => setConfirm({ action: 'unpublish', course })}
+          >
+            <Undo2 className="size-4" /> Unpublish
+          </DropdownMenuItem>
+        )}
+        {course.status === 'PUBLISHED' && (
+          <DropdownMenuItem
+            className="gap-2 cursor-pointer"
+            onSelect={() => setConfirm({ action: 'archive', course })}
+          >
+            <Archive className="size-4" /> Archive
+          </DropdownMenuItem>
+        )}
+        {course.status === 'DRAFT' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+              onSelect={() => setConfirm({ action: 'delete', course })}
+            >
+              <Trash2 className="size-4" /> Delete
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <InstructorLayout>
       <div className="p-4 sm:p-6 lg:p-8">
@@ -407,7 +478,7 @@ export default function CourseManagement() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
+                    <div className="hidden md:block overflow-x-auto custom-scrollbar">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -465,77 +536,47 @@ export default function CourseManagement() {
                                 {new Date(course.updatedAt).toLocaleDateString()}
                               </TableCell>
                               <TableCell className="text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-8"
-                                      disabled={pendingId === course.id}
-                                    >
-                                      {pendingId === course.id ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                      ) : (
-                                        <MoreHorizontal className="size-4" />
-                                      )}
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem
-                                      className="gap-2 cursor-pointer"
-                                      onSelect={() => router.push(`/owner/courses/${course.id}`)}
-                                    >
-                                      <Pencil className="size-4" /> Edit
-                                    </DropdownMenuItem>
-                                    {course.status === 'PUBLISHED' && (
-                                      <DropdownMenuItem className="gap-2 cursor-pointer" asChild>
-                                        <a href={`/courses/${course.slug}`} target="_blank" rel="noreferrer">
-                                          <Eye className="size-4" /> View public page
-                                        </a>
-                                      </DropdownMenuItem>
-                                    )}
-                                    {course.status === 'DRAFT' && (
-                                      <DropdownMenuItem
-                                        className="gap-2 cursor-pointer"
-                                        onSelect={() => setConfirm({ action: 'publish', course })}
-                                      >
-                                        <Rocket className="size-4" /> Publish
-                                      </DropdownMenuItem>
-                                    )}
-                                    {course.status === 'PUBLISHED' && (
-                                      <DropdownMenuItem
-                                        className="gap-2 cursor-pointer"
-                                        onSelect={() => setConfirm({ action: 'unpublish', course })}
-                                      >
-                                        <Undo2 className="size-4" /> Unpublish
-                                      </DropdownMenuItem>
-                                    )}
-                                    {course.status === 'PUBLISHED' && (
-                                      <DropdownMenuItem
-                                        className="gap-2 cursor-pointer"
-                                        onSelect={() => setConfirm({ action: 'archive', course })}
-                                      >
-                                        <Archive className="size-4" /> Archive
-                                      </DropdownMenuItem>
-                                    )}
-                                    {course.status === 'DRAFT' && (
-                                      <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-                                          onSelect={() => setConfirm({ action: 'delete', course })}
-                                        >
-                                          <Trash2 className="size-4" /> Delete
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                {renderCourseActions(course, 'size-8')}
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
+                    </div>
+
+                    {/* Mobile card list (compact, same actions as the table rows) */}
+                    <div className="md:hidden space-y-3">
+                      {courses.map((course) => (
+                        <div key={course.id} className="rounded-xl border bg-card p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm leading-snug">{course.title}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatLevel(course.level)} · {formatDuration(course.totalMinutes)} ·{' '}
+                                {course.totalSections} sections
+                              </p>
+                            </div>
+                            {renderCourseActions(course, 'size-9 shrink-0 -mr-1.5 -mt-1.5')}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={COURSE_STATUS_BADGE_CLASS[course.status]}>
+                              {COURSE_STATUS_LABELS[course.status]}
+                            </Badge>
+                            {course.category && (
+                              <Badge variant="secondary" className="text-xs">
+                                {course.category.name}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span className="text-sm font-medium text-foreground">
+                              {formatPrice(course.priceMinor, course.currency)}
+                            </span>
+                            <span>{formatCount(course.enrollmentCount)} students</span>
+                            <span>Updated {new Date(course.updatedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     {nextCursor && (
                       <div className="p-4 border-t text-center">

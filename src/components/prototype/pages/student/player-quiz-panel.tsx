@@ -540,7 +540,7 @@ function QuizAttemptForm({
               {question.options.map((option) => (
                 <label
                   key={option.id}
-                  className='flex cursor-pointer items-center gap-2.5 rounded-md border p-2.5 text-sm transition-colors hover:bg-muted/40 has-data-[state=checked]:border-primary/40 has-data-[state=checked]:bg-primary/5'
+                  className='flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md border px-3 py-3 text-sm transition-colors hover:bg-muted/40 has-data-[state=checked]:border-primary/40 has-data-[state=checked]:bg-primary/5'
                 >
                   <RadioGroupItem value={option.id} className='shrink-0' />
                   <span className='flex-1'>{option.text}</span>

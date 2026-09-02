@@ -6,9 +6,17 @@ import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NotificationRow } from '@/components/prototype/shared/NotificationItem';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useNav } from '@/lib/prototype/navigation';
 import {
   fetchUnreadNotificationCount,
@@ -20,10 +28,11 @@ import { ApiClientError } from '@/lib/client/api-client';
 import { NOTIFICATION_PAGE_LIMIT_DEFAULT, type NotificationDto } from '@/contracts/notifications';
 
 // Header notification bell (authenticated users only): an unread badge probed
-// on mount, plus a popover inbox that refetches on every open. Clicking a row
-// marks it read (idempotent server-side) and follows its linkPath via the
-// Next router — linkPaths are arbitrary relative paths, so useNav.navigate is
-// deliberately NOT used here.
+// on mount, plus an inbox that refetches on every open — a bottom vaul Drawer
+// on mobile (swipe-to-dismiss + scroll lock, safe-area padding) and the
+// desktop Popover above 768px. Clicking a row marks it read (idempotent
+// server-side) and follows its linkPath via the Next router — linkPaths are
+// arbitrary relative paths, so useNav.navigate is deliberately NOT used here.
 
 /** The badge caps at "9+" so a two-digit count never breaks the icon shape. */
 const UNREAD_BADGE_CAP = 9;
@@ -45,9 +54,117 @@ function BellSkeletonRows() {
   );
 }
 
+// --- Shared inbox content (rendered inside the Popover OR the Drawer) --------
+
+interface InboxContentProps {
+  unreadCount: number;
+  markAllPending: boolean;
+  listLoading: boolean;
+  listError: string | null;
+  items: NotificationDto[];
+  nextCursor: string | null;
+  loadingMore: boolean;
+  onMarkAllRead: () => void;
+  onRetry: () => void;
+  onLoadMore: () => void;
+  onOpenNotification: (notification: NotificationDto) => void;
+  /** Closes the host container (popover/drawer) when "View all" is clicked. */
+  onViewAll: () => void;
+}
+
+function InboxContent({
+  unreadCount,
+  markAllPending,
+  listLoading,
+  listError,
+  items,
+  nextCursor,
+  loadingMore,
+  onMarkAllRead,
+  onRetry,
+  onLoadMore,
+  onOpenNotification,
+  onViewAll,
+}: InboxContentProps) {
+  return (
+    <div className='flex min-h-0 flex-col'>
+      <div className='flex items-center justify-between gap-2 px-4 py-3 border-b'>
+        <p className='text-sm font-semibold'>Notifications</p>
+        {unreadCount > 0 && (
+          <Button
+            variant='ghost'
+            size='sm'
+            className='h-9 gap-1.5 text-xs'
+            onClick={onMarkAllRead}
+            disabled={markAllPending}
+            aria-label='Mark all notifications as read'
+          >
+            {markAllPending ? (
+              <Loader2 className='size-3.5 animate-spin' aria-hidden />
+            ) : (
+              <CheckCheck className='size-3.5' aria-hidden />
+            )}
+            Mark all read
+          </Button>
+        )}
+      </div>
+
+      <div className='max-h-96 overflow-y-auto custom-scrollbar'>
+        {listLoading ? (
+          <BellSkeletonRows />
+        ) : listError ? (
+          <div className='px-4 py-8 text-center'>
+            <p className='text-sm text-destructive mb-3'>{listError}</p>
+            <Button variant='outline' size='sm' onClick={onRetry}>
+              Try again
+            </Button>
+          </div>
+        ) : items.length === 0 ? (
+          <div className='px-4 py-10 text-center'>
+            <Bell className='size-8 mx-auto text-muted-foreground/40 mb-2' aria-hidden />
+            <p className='text-sm text-muted-foreground'>You&apos;re all caught up.</p>
+          </div>
+        ) : (
+          <ul className='divide-y'>
+            {items.map((notification) => (
+              <li key={notification.id}>
+                <NotificationRow notification={notification} onOpen={onOpenNotification} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {nextCursor && !listLoading && !listError && (
+        <div className='border-t p-2'>
+          <Button
+            variant='ghost'
+            size='sm'
+            className='w-full text-muted-foreground'
+            onClick={onLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore && <Loader2 className='size-3.5 animate-spin' aria-hidden />}
+            Load more
+          </Button>
+        </div>
+      )}
+
+      <Link
+        href='/notifications'
+        onClick={onViewAll}
+        className='block border-t px-4 py-2.5 text-center text-xs font-medium text-primary hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/60'
+      >
+        View all notifications
+      </Link>
+    </div>
+  );
+}
+
 export default function NotificationsBell() {
   const { isAuthenticated } = useNav();
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const [open, setOpen] = useState(false);
   // Bumped on every open so the list reloads (badge count follows suit).
@@ -181,93 +298,61 @@ export default function NotificationsBell() {
 
   if (!isAuthenticated) return null;
 
+  // The bell + badge trigger is identical for both containers.
+  const bellTrigger = (
+    <Button variant='ghost' size='icon' className='relative' aria-label='Notifications'>
+      <Bell className='size-5' />
+      {unreadCount > 0 && (
+        <span
+          aria-hidden
+          className='absolute -top-0.5 -right-0.5 min-w-4.5 h-4.5 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center'
+        >
+          {unreadCount > UNREAD_BADGE_CAP ? `${UNREAD_BADGE_CAP}+` : unreadCount}
+        </span>
+      )}
+    </Button>
+  );
+
+  const inbox = (
+    <InboxContent
+      unreadCount={unreadCount}
+      markAllPending={markAllPending}
+      listLoading={listLoading}
+      listError={listError}
+      items={items}
+      nextCursor={nextCursor}
+      loadingMore={loadingMore}
+      onMarkAllRead={() => void handleMarkAllRead()}
+      onRetry={() => setReloadToken((token) => token + 1)}
+      onLoadMore={() => void handleLoadMore()}
+      onOpenNotification={handleOpenNotification}
+      onViewAll={() => setOpen(false)}
+    />
+  );
+
+  // Mobile: bottom drawer with grab handle, swipe-to-dismiss and safe-area
+  // padding so "View all" clears the home indicator in PWA standalone.
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={handleOpenChange}>
+        <DrawerTrigger asChild>{bellTrigger}</DrawerTrigger>
+        <DrawerContent className='max-h-[85vh] overflow-hidden pb-safe'>
+          <DrawerTitle className='sr-only'>Notifications</DrawerTitle>
+          <DrawerDescription className='sr-only'>Your notification inbox</DrawerDescription>
+          {inbox}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // Desktop: the original anchored popover.
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button variant='ghost' size='icon' className='relative' aria-label='Notifications'>
-          <Bell className='size-5' />
-          {unreadCount > 0 && (
-            <span
-              aria-hidden
-              className='absolute -top-0.5 -right-0.5 min-w-4.5 h-4.5 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center'
-            >
-              {unreadCount > UNREAD_BADGE_CAP ? `${UNREAD_BADGE_CAP}+` : unreadCount}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{bellTrigger}</PopoverTrigger>
       {/* Width is clamped to the viewport minus page gutters so it never
           overflows small phones (390px). */}
       <PopoverContent align='end' className='w-[min(24rem,calc(100vw-2rem))] p-0'>
-        <div className='flex items-center justify-between gap-2 px-4 py-3 border-b'>
-          <p className='text-sm font-semibold'>Notifications</p>
-          {unreadCount > 0 && (
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-7 gap-1.5 text-xs'
-              onClick={() => void handleMarkAllRead()}
-              disabled={markAllPending}
-              aria-label='Mark all notifications as read'
-            >
-              {markAllPending ? (
-                <Loader2 className='size-3.5 animate-spin' aria-hidden />
-              ) : (
-                <CheckCheck className='size-3.5' aria-hidden />
-              )}
-              Mark all read
-            </Button>
-          )}
-        </div>
-
-        <div className='max-h-96 overflow-y-auto custom-scrollbar'>
-          {listLoading ? (
-            <BellSkeletonRows />
-          ) : listError ? (
-            <div className='px-4 py-8 text-center'>
-              <p className='text-sm text-destructive mb-3'>{listError}</p>
-              <Button variant='outline' size='sm' onClick={() => setReloadToken((token) => token + 1)}>
-                Try again
-              </Button>
-            </div>
-          ) : items.length === 0 ? (
-            <div className='px-4 py-10 text-center'>
-              <Bell className='size-8 mx-auto text-muted-foreground/40 mb-2' aria-hidden />
-              <p className='text-sm text-muted-foreground'>You&apos;re all caught up.</p>
-            </div>
-          ) : (
-            <ul className='divide-y'>
-              {items.map((notification) => (
-                <li key={notification.id}>
-                  <NotificationRow notification={notification} onOpen={handleOpenNotification} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {nextCursor && !listLoading && !listError && (
-          <div className='border-t p-2'>
-            <Button
-              variant='ghost'
-              size='sm'
-              className='w-full text-muted-foreground'
-              onClick={() => void handleLoadMore()}
-              disabled={loadingMore}
-            >
-              {loadingMore && <Loader2 className='size-3.5 animate-spin' aria-hidden />}
-              Load more
-            </Button>
-          </div>
-        )}
-
-        <Link
-          href='/notifications'
-          onClick={() => setOpen(false)}
-          className='block border-t px-4 py-2.5 text-center text-xs font-medium text-primary hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:bg-accent/60'
-        >
-          View all notifications
-        </Link>
+        {inbox}
       </PopoverContent>
     </Popover>
   );

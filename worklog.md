@@ -994,3 +994,131 @@ Stage Summary:
 - New surfaces: owner /owner/certificates console, return-for-revision, completion gating, dashboard certificate card, classroom deep links
 - Quality gates at close: typecheck 0, lint 0, tests 355/355; commit "feat: Coursera-style assessment gating, certificate console, return-for-revision, deep links"
 - The test course "Digital Skills Essentials" remains published with the student's 2 attempts, one graded 95/100, and one issued certificate - handy demo data; delete via Course Management if unwanted
+
+---
+Task ID: 16-a
+Agent: main-coordinator
+Task: Global app-shell mobile optimization (PWA + bottom nav + safe areas + foundations)
+
+Work Log:
+- Mobile audit (Explore agent) produced a ranked top-10; routing confirmed as real App Router routes behind useNav facade, so pathname-aware chrome is safe
+- PWA: public/icon.svg (navy rounded square + white graduation cap), public/manifest.webmanifest (standalone, shortcuts), scripts/generate-icons.ts (sharp) -> icon-192/512, maskable-512, apple-touch-icon.png; root layout gained export const viewport (viewportFit cover, themeColor #0a1a3e), metadata.manifest, appleWebApp + icon entries
+- globals.css: -webkit-tap-highlight-color transparent, overscroll-behavior-y none, @utility pt-safe/pb-safe/pb-safe-nav/mb-safe-nav (env(safe-area-inset-*)), iOS 16px input font-size guard (no auto-zoom on focus), sonner offset above bottom nav <=1023px
+- NEW src/components/prototype/layout/BottomNav.tsx: fixed bottom bar, variant public (Home/Courses/About/Contact/Account; md:hidden) + student (Dashboard/Learning/Certificates/Alerts w/ live unread badge/Profile; lg:hidden), active lift+dot treatment, safe-area padding, unread-count probe on route change, suppressed on learning-player route
+- Header.tsx: renders BottomNav(public); mobile "Sign in" button now visible when logged out; hamburger + rows bumped to 44px; Sheet gains pb-safe; avatar menu min-h-11; pt-safe header
+- StudentLayout.tsx: hand-rolled framer-motion drawer replaced with shadcn Sheet(side=left) (scroll-lock/focus trap/Esc); mobile header safe-area top; main pt calc(3.5rem+safe-top); trailing spacer calc(4rem+safe-bottom); BottomNav(student) wired
+- Footer.tsx: pb-28 on phones so legal row clears the bottom nav
+- Verified: lint 0, homepage 390px screenshot shows bottom nav + compact header (.evidence/m16-home-mobile.png)
+
+Stage Summary:
+- App-like chrome shipped globally: installable PWA, bottom navigation on public+student surfaces, safe-area-aware fixed headers/bars, no iOS zoom-on-focus, toasts float above nav
+- Contract for parallel waves: BottomNav.isSuppressedByPath() is the single place to hide nav per route (16-b adds /courses/{id}); subagents must NOT edit Header/StudentLayout/Footer/globals.css/root layout
+- Utilities available: pt-safe, pb-safe, pb-safe-nav, mb-safe-nav; pattern for clearing bars: trailing spacer div with calc height
+---
+Task ID: 16-r
+Agent: runtime-recovery-agent
+Task: Restore local runtime after mid-session sandbox recycle (Neon creds lost with .env revert)
+
+Work Log:
+- prisma migrate status: 16 migrations found, "Database schema is up to date!" -> 0 pending.
+- bun run db:migrate:deploy: "No pending migrations to apply." (idempotent, confirmed).
+- bun run db:generate: Prisma client generated OK.
+- Data check (dtg @ 127.0.0.1:5432): {"users":16,"courses":6,"owners":1}. Seed + owner bootstrap from prior attempt intact -> steps skipped as not needed (conditions courses==0 / owners==0 not met).
+- Owner verify: existing OWNER account = owner@dtg.test (seed owner; kosokodaniel@gmail.com bootstrap not required since owners==1).
+- Test DB: dtg_test already existed (embedded-postgres bin dir has no psql binary, so CREATE DATABASE attempted via `prisma db execute --stdin` instead; that call errored on missing --url/--schema flag but was moot because dtg_test already existed). `bun run db:migrate:deploy` against dtg_test: "All migrations have been successfully applied."
+- Dev server: started detached via `setsid nohup bun run dev > dev.log` with local DATABASE_URL/DIRECT_URL; HTTP check after 25s = 200.
+- API checks: GET /api/v1/health/ready -> {"status":"ready","database":"available"}; GET /api/v1/courses -> 200 with seeded course list (e.g. react-native-mobile-dev).
+
+Stage Summary:
+- Local runtime fully restored on embedded postgres (127.0.0.1:5432): dtg DB migrated (0 pending, 16 users / 6 courses / 1 owner @ owner@dtg.test), dtg_test DB migrated, Prisma client generated, dev server UP on http://localhost:3000 (200; /api/v1/health/ready ready; /api/v1/courses returns data). Nothing skipped due to channel errors; only skipped action was seed/owner-bootstrap (data already present).
+---
+Task ID: 16-e-fix-1
+Agent: general-purpose (sandboxed vibe coding sub agent)
+Task: Fix analytics chart horizontal overflow at 390px viewport (/owner/analytics, recharts tooltip wrapper leaking to x=450).
+
+Work Log:
+- Read src/components/prototype/pages/instructor/AnalyticsPage.tsx (734 lines); confirmed it is the component exported as OwnerAnalyticsPage at route /owner/analytics (src/features/owner/index.ts re-export).
+- Audited all 3 chart blocks (AreaChart "Enrolment Growth", PieChart "Completion Rate", BarChart "Course Revenue"): wrapping Cards already had overflow-hidden and the immediate chart-wrapper divs already had w-full min-w-0 overflow-hidden; the CardContent divs between Card and ResponsiveContainer were missing min-w-0 w-full.
+- Applied 3 class edits (CardContent of each chart block): "pt-0" -> "pt-0 min-w-0 w-full" (2x) and "pt-0 flex flex-col items-center justify-center" -> "pt-0 min-w-0 w-full flex flex-col items-center justify-center" (1x). No data, heights, or chart types changed.
+- bunx tsc --noEmit from /home/z/my-project: exit 0, 0 errors.
+- Dev server had to be restarted: shell env DATABASE_URL=file:... overrode .env postgres URL causing /api/auth/sign-in 500; restarted with DATABASE_URL=postgresql://postgres@127.0.0.1:5432/dtg.
+- Browser verification (agent-browser, viewport 390x844): signed in via /login UI as kosokodaniel@gmail.com, opened /owner/analytics, eval document.documentElement.scrollWidth = 390 (body.scrollWidth = 390) <= 391. Screenshot saved to .evidence/16efix-analytics.png.
+
+Stage Summary: Analytics page chart blocks are now fully clamped (Card overflow-hidden + min-w-0 w-full on every div between Card and ResponsiveContainer); no horizontal overflow at 390px; tsc clean; evidence captured.
+
+---
+Task ID: 16-e-fix-2
+Agent: general-purpose (Claude sub agent, vibe coding workspace)
+
+Task: Fix horizontal overflow of the course editor page at 390px viewport (content extended to x=524; TabsList rendered 408px wide with no internal scroll). Scope: src/components/prototype/pages/instructor/CourseEditorPage.tsx only (globals.css untouched — .custom-scrollbar utility already existed at line 165).
+
+Work Log:
+- Walked the container chain page root → TabsList: html/body → InstructorLayout `div.min-h-screen.flex` → `main.min-w-0.flex-1` (min-w-0 already present, so the flex item can shrink below content min-width) → block `motion.div.min-h-screen` → `div.p-4` → `motion.div.max-w-5xl.mx-auto.space-y-6` → `motion.div` → `Tabs (flex flex-col)` → TabsList. Chain is clean; no further min-w-0 needed on this path.
+- Audited CourseEditorPage.tsx for the 524px-forcing element. Findings confirmed in working tree (uncommitted edits from the earlier interrupted pass of this fix, verified line-by-line against the task spec):
+  1. TabsList (line ~404): `h-11 w-full max-w-full justify-start overflow-x-auto custom-scrollbar flex-nowrap sm:w-fit` — matches spec exactly (h-11 kept); TabsTrigger ×3: `shrink-0 px-4 sm:px-3`.
+  2. Media tab: hidden file input inherited Input base `w-full h-9`, so the "sr-only" ghost input stayed full-width and extended the page past the viewport — fixed with `className="sr-only w-px h-px"` (tw-merge makes w-px/h-px win over the base w-full/h-9).
+  3. Metadata: slug paragraphs got `break-words` (header slug line + CardDescription with long /courses/{slug}).
+  4. Curriculum header row: `flex items-center justify-between` → `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between` with `min-w-0` on the text column and `flex-wrap` on the buttons (desktop row behavior preserved at sm+).
+  5. Lesson rows: `flex-1 truncate` → `flex-1 min-w-0 truncate`; rows wrap on phones (`flex-wrap`).
+  6. grids already responsive (`grid-cols-1 sm:grid-cols-2/3`); no `min-w-[...]` / `whitespace-nowrap` / fixed `w-[...]` remained.
+- Live verification with agent-browser at 390×844 (signed in as kosokodaniel@gmail.com, /owner/courses → card menu → Edit):
+  - BEFORE (per bug report): documentElement.scrollWidth = 524; TabsList 408px, scrollWidth == clientWidth (no internal scroll).
+  - AFTER: metadata tab scrollWidth = 390; media tab = 390; curriculum tab = 390 (all ≤ 391 ✓). Zero elements with right edge > 391 on any tab.
+  - TabsList: scrollWidth 358 == clientWidth 358 (all triggers fit at 390px; overflow-x-auto + flex-nowrap + shrink-0 armed so it scrolls internally instead of growing if content ever exceeds max-w-full) ✓.
+- Desktop sanity at 1280×800: documentElement.scrollWidth = 1280; TabsList w-fit = 328px, sw == cw (no scroll, identical desktop layout). Screenshots: .evidence/16efix-editor.png (390px), .evidence/16efix-editor-desktop.png (1280px).
+- Quality gates: `bunx tsc --noEmit` → exit 0 (0 errors); `bun run lint` → exit 0 (0 errors).
+
+Stage Summary: Course editor page is overflow-free at 390px on all three tabs (scrollWidth 390 ≤ 391) with the TabsList constrained to max-w-full + internal horizontal scroll fallback; desktop (1280px) rendering unchanged (w-fit TabsList, h-11). Root causes closed: (a) ancestor flex chain letting the tab row grow (main lacks min-w-0 — fixed via InstructorLayout in the companion fix task, verified present), (b) Media tab's full-width sr-only file input (fixed w-px h-px), (c) non-wrapping Curriculum header row and unbreakable slug lines (flex-col on mobile, min-w-0, break-words). Files touched: src/components/prototype/pages/instructor/CourseEditorPage.tsx only for this task's scope; globals.css untouched. Gates green: tsc 0, lint 0. Next actions: none blocking — optional future hardening: verify TabsList internal scroll at <340px viewports.
+
+---
+Task ID: 16-e-fix-3
+Agent: general-purpose (Claude sub agent, vibe coding workspace)
+
+Task: Fix player first-load flake in the learning player: (a) first navigation sometimes latched "Could not load this lesson / The requested course does not exist or is not published" even though underlying APIs returned 200 (reload fixed it); (b) browser issued GET /api/v1/learning/courses/<courseUUID>/progress which 404s (endpoint is keyed by course SLUG; the [courseId] route param can be a UUID on notification deep links). Allowed files: src/components/prototype/pages/student/LearningPlayerPage.tsx and src/features/learning/api.ts only.
+
+Work Log:
+- Read src/features/learning/api.ts: fetchCourseProgress(slug) is slug-keyed (GET /api/v1/learning/courses/{slug}/progress); fetchLessonAccess(lessonId) returns LessonAccessDto whose course object carries { id, slug, title } (src/contracts/learning.ts line 132) — so the payload slug is always available to key the progress read.
+- Audited callers: CourseDetailPage.tsx calls fetchCourseProgress(slug) correctly; the only offender was LearningPlayerPage's data-fetch effect, whose committed version ran `Promise.all([fetchLessonAccess(lessonId), fetchCourseProgress(slug)])` — keying progress by the RAW URL param (a UUID on /learning/<uuid>/<lessonId> deep links) and latching any failure into the shared error UI. The working tree already contained the corrected implementation from an earlier interrupted pass of this task; verified it line-by-line against the spec (pattern matched to how 16-e-fix-2 handled its earlier interrupted pass):
+  1. Sequential load: fetchLessonAccess first, then fetchCourseProgress(accessDto.course.slug || slug) — progress is keyed by the payload SLUG, never the raw UUID param (fix for (b)).
+  2. Race handling (fix for (a)): every state write is guarded by an effect-scoped `cancelled` flag set in cleanup; `requestKey = ${slug}|${lessonId}#${retrySeed}` with derived `loading = loadedKey !== requestKey`; the `finally` only closes the request key for the still-current attempt (`if (!cancelled) setLoadedKey(requestKey)`), so a superseded/strict-mode-double-mount attempt can never set error state or flip the loading gate.
+  3. The error branch (`if (loadError || !lessonAccess || !progress || !totals)`) is only reachable after the loading gate passes, so it never renders while a matching fetch is in flight; genuine (current-attempt) progress failures still surface the retry UI.
+  4. Preview mode, assessment gate hints, notes/QA tabs, mark-complete, certificate claim, curriculum drawer: untouched.
+- Refined the progress-catch comment to state the invariant precisely (a superseded attempt is filtered by the cancelled guard; in-flight attempts are hidden by the requestKey skeleton gate). Comment-only change; no logic touched. api.ts needed no changes (signature already slug-keyed).
+- Quality gates: `bunx tsc --noEmit` exit 0 (0 errors); `bun run lint` exit 0 (0 errors).
+- Browser verification (agent-browser, viewport 390x844, signed in as student@dtg.test / 123456789012 after dev-server restart with postgres DATABASE_URL):
+  - /learning → course card → course detail "Go to Classroom" → player (slug URL) renders lesson content, no error UI; `agent-browser errors` empty.
+  - Curriculum drawer: navigated to "Core Components" (2 / 2) and back to "Setting Up React Native" (1 / 2) — content rendered both times, no error UI.
+  - Fresh full-page opens (agent-browser open <player url>) x2 (both lessons) — content rendered, no "Could not load this lesson", errors empty.
+  - UUID deep-link regression test (the exact bug-(b) path): fresh open of /learning/682b05ed-68a7-40a4-b668-a08e8394ebac/<lessonId> — lesson content rendered, NO error UI, zero page errors, and the network log shows exactly ONE progress call: GET /api/v1/learning/courses/react-native-mobile-dev/progress (slug-keyed) → 200; zero UUID-keyed progress calls (verified with a no-match filter control: agent-browser prints one "no requests" line when a filter matches nothing).
+  - All progress calls across the session were slug-keyed and 200. Screenshot: .evidence/16efix-player.png.
+
+Stage Summary: Root causes closed. (a) The player latched full-page errors from a stale/raced fetch: the committed effect ran access+progress in parallel with no per-attempt gating, so a superseded attempt (strict-mode double mount / fast param change) could write loadError into the shared error branch — now every attempt is keyed (requestKey + cancelled guard + derived loading), only the current attempt may set error state, and the skeleton gate hides the error branch while a matching fetch is in flight. (b) The progress read was keyed by the raw [courseId] URL param, which is a UUID on notification deep links and 404s the slug-keyed endpoint — now the progress call uses the course slug from the lesson-access payload (fetchCourseProgress(accessDto.course.slug || slug)). Verified across slug navigation, drawer round-trip, 2 fresh full-page opens, and a UUID deep-link open: content always renders, no error UI, no 404s, all progress calls slug-keyed 200. Gates green: tsc 0, lint 0. Files touched: src/components/prototype/pages/student/LearningPlayerPage.tsx (logic fix was already in the working tree from the interrupted pass; this pass verified it against spec and corrected the invariant comment), src/features/learning/api.ts unchanged. Next actions: none blocking; optional future hardening — normalize the URL to the slug after a UUID deep-link load, and consider an AbortController if the access request ever becomes expensive.
+---
+Task ID: 16-b/c/d (consolidated record)
+Agent: main-coordinator (recording landed work of the parallel wave agents, whose own entries were lost to an infra deadline)
+Task: Mobile app-like optimization waves - public pages, student flows, owner surfaces
+
+Work Log:
+- 16-b (public): CoursesPage - sticky search + Filters button with active-count badge, vaul bottom Drawer for filters on mobile (same state drives both layouts), removable active-filter chips, 44px pills; CourseDetailPage - fixed bottom enroll bar (price + CTA mirroring the desktop purchase-card logic, safe-area padding, trailing spacer, bottom nav suppressed on /courses/{id} via BottomNav.isSuppressedByPath); HomePage - embla swipe rail (basis-85%) for featured courses on mobile, desktop grid unchanged, min-h-12 CTAs with active:scale feedback; overflow-x-clip on main
+- 16-c (student): LearningPlayerPage - hand-rolled curriculum drawer replaced by vaul Drawer direction=right (swipe-dismiss, scroll lock), pt-safe top bar, safe-area bottom Prev/Next bar, 44px mark-complete/tabs/back buttons; NotificationsBell - shared InboxContent, bottom Drawer on mobile via useIsMobile (Popover on desktop), h-9 mark-all; NotificationsPage - 44px controls; player-quiz-panel - 44px option rows
+- 16-d (owner): InstructorLayout - Sheet(side=left) replaces hand-rolled drawer; CourseManagement/GradingQueuePage/StudentManagement/CertificatesAdminPage - mobile card lists (md:hidden) alongside desktop tables, shared action menus; grading-detail-dialog - full-height right Sheet on mobile sharing identical inner content with the desktop Dialog; CourseEditorPage - hover-gated size-7 controls now always visible + size-9 on touch; ReviewsModeration - 44px filter select
+- All landed code passed lint + typecheck; consolidated here because the three subagents were killed by an infra timeout before writing their own entries
+
+Stage Summary:
+- Full mobile app-like pass landed across public/student/owner; evidence in .evidence/16e-*.png; contract: BottomNav.isSuppressedByPath is the single route-suppression point
+---
+Task ID: 16-e (coordinator)
+Agent: main-coordinator
+Task: QA the mobile wave end-to-end on the restored local runtime, fix findings, ship
+
+Work Log:
+- Sandbox recycled mid-session AGAIN: .env reverted (Neon/R2/SMTP credentials LOST from the sandbox - production data itself safe in Neon cloud), dev server killed, my tool channel suffered a prolonged outage (403s); all work completed via shell-proxy subagents
+- Runtime restored: scripts/sandbox-db.sh local postgres (127.0.0.1:5432, dtg + dtg_test migrated), seed re-applied, owner kosokodaniel@gmail.com / G.s.o.m.1.2.3. re-provisioned + promoted (PlatformSettings.ownerUserId), student@dtg.test / 123456789012 registered for QA, react-native-mobile-dev set free for enroll QA; dev server pinned to local postgres via explicit export
+- QA results: public 6/6 PASS (390px, zero overflow, filters drawer, enroll bar, nav suppression); student surfaces PASS (bottom nav 5 items, player right-drawer, sticky bars, 44px controls); owner surfaces PASS (cards everywhere, left Sheet drawer, grading sheet empty-state); desktop spot-checks PASS (tables/grids/sidebar intact)
+- Test suite: 362/362 (earlier failures were the sandbox sqlite DATABASE_URL shadow - with local pg URLs exported everything passes)
+- BUGS FOUND+FIXED: (1) /owner/analytics 390px overflow 450->390 (CardContent min-w-0 w-full on 3 chart blocks); (2) course editor page overflow 524->390 on all tabs (InstructorLayout main min-w-0, TabsList max-w-full overflow-x-auto flex-nowrap + shrink-0 triggers, sr-only file input w-px h-px, break-words on slugs, fluid curriculum header); (3) player first-load error flake + UUID-keyed progress 404 (sequential load: lesson-access then progress keyed by payload slug, requestKey+cancelled gating so stale attempts can never latch the error UI - verified via UUID deep-link regression test: exactly one slug-keyed 200, zero errors)
+- Final sweep: lint 0, tsc 0, 362/362 tests, no overflow on any student/owner/public page, bell bottom-drawer verified, footer/nav clearance 47px, dev.log clean
+
+Stage Summary:
+- The platform is now app-like on mobile end to end: PWA-installable (manifest+icons+theme), bottom navigation on public+student surfaces, bottom sheets for filters/notifications/grading, swipe drawer for the player curriculum, sticky enroll/action bars with safe-area support, 44px touch targets, no iOS zoom-on-focus, toasts clear the nav
+- OPEN ITEM FOR USER: .env lost the real Neon/R2/SMTP credentials in the recycle - re-enter them (or provide again) to reconnect the production DB; the platform currently runs on the sandbox-local postgres

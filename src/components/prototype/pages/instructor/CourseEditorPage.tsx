@@ -326,7 +326,7 @@ export default function CourseEditorPage() {
                   </Badge>
                   <Badge variant="secondary" className="text-xs">v{course.version}</Badge>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground mt-1 break-words">
                   /courses/{course.slug} · {formatLevel(course.level)} · last updated{' '}
                   {formatDate(course.updatedAt)}
                 </p>
@@ -401,10 +401,10 @@ export default function CourseEditorPage() {
                 setActiveTab(value as 'metadata' | 'media' | 'curriculum')
               }
             >
-              <TabsList>
-                <TabsTrigger value="metadata">Metadata</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
-                <TabsTrigger value="curriculum">
+              <TabsList className="h-11 w-full max-w-full justify-start overflow-x-auto custom-scrollbar flex-nowrap sm:w-fit">
+                <TabsTrigger value="metadata" className="shrink-0 px-4 sm:px-3">Metadata</TabsTrigger>
+                <TabsTrigger value="media" className="shrink-0 px-4 sm:px-3">Media</TabsTrigger>
+                <TabsTrigger value="curriculum" className="shrink-0 px-4 sm:px-3">
                   Curriculum
                   <Badge variant="secondary" className="ml-2 text-xs">
                     {course.totalSections} · {course.totalLessons}
@@ -596,7 +596,10 @@ function MediaTab({ course, onSaved }: MediaTabProps) {
             type="file"
             accept={COURSE_THUMBNAIL_CONTENT_TYPES.join(',')}
             onChange={handleThumbnailChange}
-            className="sr-only"
+            // w-px/h-px beat the Input base w-full/h-9 via tw-merge so sr-only
+            // is actually 1x1 — the full-width ghost input otherwise extended
+            // the page past the viewport on phones (Media tab overflow).
+            className="sr-only w-px h-px"
           />
           <Button
             type="button"
@@ -742,7 +745,7 @@ function MetadataTab({ course, categories, levels, onSaved }: MetadataTabProps) 
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Course metadata</CardTitle>
-        <CardDescription>
+        <CardDescription className="break-words">
           Describes the course everywhere it is shown. The slug /courses/{course.slug} stays
           permanent so existing links keep working.
         </CardDescription>
@@ -993,8 +996,10 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          {/* Stacks on phones so the action buttons wrap to their own line
+              instead of forcing the row (and the page) wider than the view. */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <CardTitle className="text-base">Curriculum</CardTitle>
               <CardDescription>
                 {course.totalSections} {course.totalSections === 1 ? 'section' : 'sections'} ·{' '}
@@ -1007,6 +1012,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                 <Button
                   size="sm"
                   variant="outline"
+                  className="min-h-10 sm:min-h-8"
                   onClick={() => setLessonDialog({ mode: 'create', section: latestSection })}
                   disabled={busy}
                 >
@@ -1018,7 +1024,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                 size="sm"
                 onClick={() => setSectionDialog({ mode: 'create' })}
                 disabled={busy}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="min-h-10 sm:min-h-8 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 <Plus className="size-4 mr-2" />
                 Add section
@@ -1062,7 +1068,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-9 md:size-7 active:scale-95"
                     disabled={busy || index === 0}
                     onClick={() =>
                       void withBusy(() => reorderSection(section.id, section.position - 1))
@@ -1074,7 +1080,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-9 md:size-7 active:scale-95"
                     disabled={busy || index === sections.length - 1}
                     onClick={() =>
                       void withBusy(() => reorderSection(section.id, section.position + 1))
@@ -1086,7 +1092,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-9 md:size-7 active:scale-95"
                     disabled={busy}
                     onClick={() => setSectionDialog({ mode: 'rename', section })}
                     aria-label="Rename section"
@@ -1096,7 +1102,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7 text-destructive hover:text-destructive"
+                    className="size-9 md:size-7 text-destructive hover:text-destructive active:scale-95"
                     disabled={busy}
                     onClick={() => setSectionDeleteTarget(section)}
                     aria-label="Delete section"
@@ -1111,12 +1117,12 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                   {section.lessons.map((lesson, lessonIndex) => (
                     <div
                       key={lesson.id}
-                      className="flex items-center gap-2 px-3 py-2.5 pl-5 group hover:bg-muted/30 transition-colors"
+                      className="flex flex-wrap items-center gap-2 px-3 py-2.5 pl-5 hover:bg-muted/30 transition-colors"
                     >
                       <span className="text-muted-foreground shrink-0">
                         {LESSON_TYPE_ICONS[lesson.type]}
                       </span>
-                      <span className="text-sm flex-1 truncate">{lesson.title}</span>
+                      <span className="text-sm flex-1 min-w-0 truncate">{lesson.title}</span>
                       {lesson.isPreview && (
                         <Badge variant="secondary" className="text-xs shrink-0">
                           Preview
@@ -1134,7 +1140,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="size-9 md:size-7 active:scale-95"
                           disabled={busy || lessonIndex === 0}
                           onClick={() =>
                             void withBusy(() =>
@@ -1151,7 +1157,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="size-9 md:size-7 active:scale-95"
                           disabled={busy || lessonIndex === section.lessons.length - 1}
                           onClick={() =>
                             void withBusy(() =>
@@ -1168,7 +1174,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="size-9 md:size-7 active:scale-95"
                           disabled={busy || sections.length < 2}
                           onClick={() => setLessonMoveTarget(lesson)}
                           aria-label="Move lesson to another section"
@@ -1180,7 +1186,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="size-9 md:size-7 active:scale-95"
                             disabled={busy}
                             onClick={() => setAssessmentLesson(lesson)}
                             aria-label={
@@ -1197,7 +1203,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="size-9 md:size-7 active:scale-95"
                           disabled={busy}
                           onClick={() => setLessonDialog({ mode: 'edit', lesson })}
                           aria-label="Edit lesson"
@@ -1207,7 +1213,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                          className="size-9 md:size-7 active:scale-95 text-destructive hover:text-destructive"
                           disabled={busy}
                           onClick={() => setLessonDeleteTarget(lesson)}
                           aria-label="Delete lesson"
@@ -1224,7 +1230,7 @@ function CurriculumTab({ course, onRefetch }: CurriculumTabProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-muted-foreground"
+                  className="w-full min-h-10 sm:min-h-8 text-muted-foreground"
                   disabled={busy}
                   onClick={() => setLessonDialog({ mode: 'create', section })}
                 >

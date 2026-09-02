@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   BookOpen,
@@ -15,10 +15,12 @@ import {
   MessageSquareQuote,
   Award,
   LogOut,
+  Menu,
 } from 'lucide-react';
 import { useNav } from '@/lib/prototype/navigation';
 import type { ViewName } from '@/lib/prototype/types';
 import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 interface NavItem {
   label: string;
@@ -92,8 +94,9 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
             <button
               key={item.view}
               onClick={() => handleNav(item.view)}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                'w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all active:bg-white/15',
                 isActive
                   ? 'bg-primary text-primary-foreground'
                   : 'text-background/70 hover:bg-white/10 hover:text-background'
@@ -108,7 +111,7 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
         <div className="pt-3 mt-3 border-t border-white/10">
           <button
             onClick={() => handleNav('courses')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all active:bg-white/15"
           >
             <ArrowLeft className="size-5" />
             Back to Courses
@@ -117,17 +120,17 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="p-3 border-t border-white/10">
+      <div className="p-3 pb-safe border-t border-white/10">
         <button
           onClick={() => handleNav('home')}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all active:bg-white/15"
         >
           <ExternalLink className="size-4" />
           Visit Site
         </button>
         <button
           onClick={() => { logout(); onClose?.(); }}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all mt-1"
+          className="w-full flex items-center gap-2.5 px-3 py-3 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all active:bg-white/15 mt-1"
         >
           <LogOut className="size-4" />
           Logout
@@ -149,52 +152,53 @@ export default function InstructorLayout({ children, activeView }: InstructorLay
         <SidebarContent effectiveView={effectiveView} />
       </aside>
 
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-foreground text-background px-4 py-3 flex items-center justify-between">
+      {/* Mobile Header — safe-area aware so it clears the status bar in
+          standalone (installed PWA) mode. */}
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-foreground text-background px-4 py-3 flex items-center justify-between"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
+      >
         <button
           onClick={() => navigate('home')}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-h-11"
+          aria-label="DTG home"
         >
           <div className="size-8 rounded-lg bg-primary flex items-center justify-center">
             <GraduationCap className="size-4 text-primary-foreground" />
           </div>
           <span className="text-base font-bold">DTG</span>
         </button>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="flex items-center gap-2 text-sm font-medium text-background/70 hover:text-background"
-        >
-          <LayoutDashboard className="size-5" />
-          Menu
-        </button>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <button
+              className="flex items-center gap-2 text-sm font-medium min-h-11 px-3 -mr-2 rounded-md text-background/70 hover:text-background hover:bg-white/10 transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="size-5" />
+              Menu
+            </button>
+          </SheetTrigger>
+          <SheetContent
+            side="left"
+            className="w-72 p-0 pb-safe bg-foreground text-background border-white/10 [&>button]:size-11 [&>button]:text-background/70 [&>button]:hover:text-background [&>button]:hover:opacity-100 [&>button]:flex [&>button]:items-center [&>button]:justify-center"
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>Owner navigation</SheetTitle>
+            </SheetHeader>
+            <SidebarContent
+              effectiveView={effectiveView}
+              onClose={() => setMobileOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
       </div>
 
-      {/* Mobile Drawer */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <div className="fixed inset-0 z-[60] lg:hidden">
-            <div
-              className="absolute inset-0 bg-black/50"
-              onClick={() => setMobileOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute left-0 top-0 bottom-0 w-72 shadow-2xl"
-            >
-              <SidebarContent
-                effectiveView={effectiveView}
-                onClose={() => setMobileOpen(false)}
-              />
-            </motion.aside>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <main className="flex-1 lg:ml-64 pt-14 lg:pt-0">
+      {/* Main Content — pt-14 clears the fixed mobile header; the safe-area
+          spacer covers the extra status-bar inset on notched devices.
+          min-w-0 lets the flex item shrink below its content min-width so
+          wide children can never push the page past the viewport. */}
+      <main className="min-w-0 flex-1 lg:ml-64 pt-14 lg:pt-0">
+        <div className="lg:hidden" style={{ height: 'env(safe-area-inset-top, 0px)' }} aria-hidden />
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import {
@@ -27,6 +26,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -82,7 +88,7 @@ interface ProgressTotals {
 function PlayerSkeleton() {
   return (
     <div className='min-h-screen bg-background flex flex-col'>
-      <header className='sticky top-0 z-40 bg-card border-b'>
+      <header className='sticky top-0 z-40 bg-card border-b pt-safe'>
         <div className='flex items-center gap-3 px-3 sm:px-4 h-14'>
           <Skeleton className='size-9 rounded-md' />
           <Skeleton className='h-4 w-40' />
@@ -270,59 +276,63 @@ export default function LearningPlayerPage() {
 
   useEffect(() => {
     let cancelled = false;
-    // Lesson access and the public course progress are independent reads —
-    // fire them in parallel and render once both have settled.
-    Promise.all([
-      fetchLessonAccess(lessonId).then(
-        (dto) => ({ ok: true as const, dto }),
-        (err: unknown) => ({ ok: false as const, err }),
-      ),
-      fetchCourseProgress(slug).then(
-        (dto) => ({ ok: true as const, dto }),
-        (err: unknown) => ({ ok: false as const, err }),
-      ),
-    ]).then(([accessResult, progressResult]) => {
-      if (cancelled) return;
-      let accessOk = false;
-      if (accessResult.ok) {
-        setLessonAccess(accessResult.dto);
+    // Lesson access resolves first; the course progress read is keyed by the
+    // course SLUG, and the `[courseId]` URL param is not always a slug (some
+    // notification deep links fall back to the course UUID) — so the progress
+    // call uses the slug from the access payload, never the raw URL param.
+    const load = async () => {
+      try {
+        const accessDto = await fetchLessonAccess(lessonId);
+        if (cancelled) return;
+        setLessonAccess(accessDto);
         setNotFound(false);
         setLoadError(null);
-        accessOk = true;
-      } else {
-        const err = accessResult.err;
-        if (err instanceof ApiClientError && err.status === 404 && err.code === LESSON_NOT_FOUND) {
+        try {
+          const progressDto = await fetchCourseProgress(accessDto.course.slug || slug);
+          if (cancelled) return;
+          setProgress(progressDto);
+          setCompletedSet(
+            new Set(
+              progressDto.sections.flatMap((section) =>
+                section.lessons.filter((lesson) => lesson.completed).map((lesson) => lesson.id),
+              ),
+            ),
+          );
+          setTotals({
+            totalLessons: progressDto.totalLessons,
+            completedLessons: progressDto.completedLessons,
+            progressPercent: progressDto.progressPercent,
+          });
+        } catch (progressErr: unknown) {
+          if (cancelled) return;
+          // Only a still-current progress failure may latch the error UI — a
+          // superseded attempt is filtered by the cancelled guard above, and
+          // while a matching attempt is in flight the requestKey loading gate
+          // renders the skeleton instead of this branch.
+          setLoadError(
+            progressErr instanceof Error
+              ? progressErr.message
+              : 'Failed to load the course curriculum.',
+          );
+        }
+      } catch (accessErr: unknown) {
+        if (cancelled) return;
+        if (
+          accessErr instanceof ApiClientError &&
+          accessErr.status === 404 &&
+          accessErr.code === LESSON_NOT_FOUND
+        ) {
           setNotFound(true);
         } else {
-          setLoadError(err instanceof Error ? err.message : 'Failed to load this lesson.');
+          setLoadError(accessErr instanceof Error ? accessErr.message : 'Failed to load this lesson.');
         }
+      } finally {
+        // Only the still-current attempt may close out the request key; a
+        // superseded one stays cancelled and cannot flip the loading gate.
+        if (!cancelled) setLoadedKey(requestKey);
       }
-      if (progressResult.ok) {
-        const dto = progressResult.dto;
-        setProgress(dto);
-        setCompletedSet(
-          new Set(
-            dto.sections.flatMap((section) =>
-              section.lessons.filter((lesson) => lesson.completed).map((lesson) => lesson.id),
-            ),
-          ),
-        );
-        setTotals({
-          totalLessons: dto.totalLessons,
-          completedLessons: dto.completedLessons,
-          progressPercent: dto.progressPercent,
-        });
-      } else if (accessOk) {
-        // The sidebar is impossible without the public progress read — surface
-        // an honest error instead of guessing a curriculum.
-        setLoadError(
-          progressResult.err instanceof Error
-            ? progressResult.err.message
-            : 'Failed to load the course curriculum.',
-        );
-      }
-      setLoadedKey(requestKey);
-    });
+    };
+    void load();
     return () => {
       cancelled = true;
     };
@@ -371,7 +381,9 @@ export default function LearningPlayerPage() {
     if (claimingCertificate) return;
     setClaimingCertificate(true);
     try {
-      await claimCertificate(slug);
+      // The claim endpoint is slug-keyed; prefer the payload slug (the URL
+      // param can be a UUID on notification deep links).
+      await claimCertificate(lessonAccess?.course.slug || slug);
       toast.success('Certificate issued');
       router.push('/certificates');
     } catch (err: unknown) {
@@ -515,11 +527,11 @@ export default function LearningPlayerPage() {
 
   return (
     <div className='min-h-screen bg-background flex flex-col'>
-      {/* Top bar */}
-      <header className='sticky top-0 z-40 bg-card border-b'>
+      {/* Top bar — pt-safe clears the status bar in PWA standalone mode */}
+      <header className='sticky top-0 z-40 bg-card border-b pt-safe'>
         <div className='flex items-center justify-between px-3 sm:px-4 h-14'>
           <div className='flex items-center gap-2 min-w-0'>
-            <Button asChild variant='ghost' size='icon' className='shrink-0'>
+            <Button asChild variant='ghost' size='icon' className='min-h-11 min-w-11 shrink-0'>
               <Link href='/learning' aria-label='Back to My Learning'>
                 <ArrowLeft className='size-4' />
               </Link>
@@ -537,8 +549,9 @@ export default function LearningPlayerPage() {
             <Button
               variant='outline'
               size='sm'
-              className='lg:hidden gap-1.5'
+              className='lg:hidden min-h-11 gap-1.5'
               onClick={() => setCurriculumOpen(true)}
+              aria-label='Open curriculum'
             >
               <List className='size-4' />
               <span className='hidden sm:inline'>Curriculum</span>
@@ -554,7 +567,8 @@ export default function LearningPlayerPage() {
       <div className='flex-1 flex'>
         {/* Left: lesson content + notes/Q&A */}
         <div className='flex-1 flex flex-col min-w-0'>
-          <div className='p-4 sm:p-6 space-y-4 flex-1'>
+          {/* Bottom padding keeps the last content lines clear of the sticky bar */}
+          <div className='p-4 pb-6 sm:p-6 sm:pb-8 space-y-4 flex-1'>
             {/* Preview banner */}
             {accessLevel === 'PREVIEW' && (
               <div className='flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200'>
@@ -606,7 +620,7 @@ export default function LearningPlayerPage() {
             {isEnrolled && (
               <div className='flex flex-col items-end gap-1'>
                 {isCurrentCompleted ? (
-                  <Button variant='secondary' disabled className='gap-1.5'>
+                  <Button variant='secondary' disabled className='min-h-11 gap-1.5'>
                     <CheckCircle2 className='size-4 text-emerald-600' />
                     Completed
                   </Button>
@@ -615,7 +629,7 @@ export default function LearningPlayerPage() {
                     <Button
                       onClick={handleMarkComplete}
                       disabled={completing || !assessmentGate.satisfied}
-                      className='gap-1.5'
+                      className='min-h-11 gap-1.5'
                     >
                       {completing && <Loader2 className='size-4 animate-spin' />}
                       Mark as complete
@@ -664,13 +678,13 @@ export default function LearningPlayerPage() {
               <TabsList className='h-auto p-0 bg-transparent gap-0'>
                 <TabsTrigger
                   value='notes'
-                  className='rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 py-3 text-sm'
+                  className='min-h-11 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 py-3 text-sm'
                 >
                   Notes
                 </TabsTrigger>
                 <TabsTrigger
                   value='qa'
-                  className='rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 py-3 text-sm'
+                  className='min-h-11 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 py-3 text-sm'
                 >
                   Q&amp;A
                 </TabsTrigger>
@@ -697,13 +711,19 @@ export default function LearningPlayerPage() {
             </Tabs>
           </div>
 
-          {/* Prev / Next navigation */}
-          <div className='border-t bg-card p-3 sm:p-4 flex items-center justify-between sticky bottom-0'>
+          {/* Prev / Next navigation — bottom padding clears the home indicator
+              in PWA standalone (desktop keeps the original p-3 sm:p-4 rhythm) */}
+          <div
+            className={cn(
+              'border-t bg-card px-3 pt-3 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]',
+              'sm:px-4 sm:pt-4 sm:pb-4 flex items-center justify-between sticky bottom-0',
+            )}
+          >
             <Button
               variant='outline'
               onClick={() => goToLesson(lessonAccess.prevLesson)}
               disabled={!lessonAccess.prevLesson}
-              className='gap-1.5'
+              className='min-h-11 gap-1.5'
             >
               <ChevronLeft className='size-4' />
               <span className='hidden sm:inline'>Previous</span>
@@ -721,7 +741,7 @@ export default function LearningPlayerPage() {
             <Button
               onClick={() => goToLesson(lessonAccess.nextLesson)}
               disabled={!lessonAccess.nextLesson}
-              className='gap-1.5'
+              className='min-h-11 gap-1.5'
             >
               <span className='hidden sm:inline'>Next</span>
               <ChevronRight className='size-4' />
@@ -735,37 +755,32 @@ export default function LearningPlayerPage() {
         </aside>
       </div>
 
-      {/* Mobile curriculum drawer */}
-      <AnimatePresence>
-        {curriculumOpen && (
-          <div className='fixed inset-0 z-50 lg:hidden'>
-            <div
-              className='absolute inset-0 bg-black/50'
-              onClick={() => setCurriculumOpen(false)}
-            />
-            <motion.aside
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className='absolute right-0 top-0 bottom-0 w-80 sm:w-96 bg-card border-l shadow-xl flex flex-col'
-            >
-              <div className='flex items-center justify-between p-4 border-b'>
-                <h3 className='font-semibold'>Curriculum</h3>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='shrink-0'
-                  onClick={() => setCurriculumOpen(false)}
-                >
-                  <X className='size-4' />
-                </Button>
-              </div>
-              <div className='flex-1 min-h-0'>{mobileCurriculum}</div>
-            </motion.aside>
+      {/* Mobile curriculum drawer — vaul right drawer: swipe-to-dismiss,
+          scroll lock and focus a11y for free (replaces the hand-rolled
+          framer-motion aside). Trigger stays the top-bar Curriculum button. */}
+      <Drawer direction='right' open={curriculumOpen} onOpenChange={setCurriculumOpen}>
+        <DrawerContent className='w-[85vw] max-w-[85vw] sm:w-80 sm:max-w-sm overflow-hidden'>
+          <div className='flex items-center justify-between border-b p-4'>
+            <div>
+              <DrawerTitle className='font-semibold'>Curriculum</DrawerTitle>
+              <DrawerDescription className='sr-only'>
+                Course sections and lessons
+              </DrawerDescription>
+            </div>
+            <DrawerClose asChild>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='min-h-11 min-w-11 shrink-0'
+                aria-label='Close curriculum'
+              >
+                <X className='size-4' />
+              </Button>
+            </DrawerClose>
           </div>
-        )}
-      </AnimatePresence>
+          <div className='min-h-0 flex-1 custom-scrollbar'>{mobileCurriculum}</div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

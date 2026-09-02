@@ -147,6 +147,61 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Mobile app foundations
+   --------------------------------------------------------------------------- */
+
+/* Native-app feel: no grey flash boxes on tap; the browser stays inside its
+   viewport instead of rubber-banding (pull-to-refresh is a web-only gesture). */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Momentum scrolling for inner scroll areas on iOS. */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe-area utilities — used by the mobile chrome (headers, bottom nav,
+   sticky action bars) so content clears the iOS status bar / home indicator
+   when the app runs in standalone (installed PWA) mode. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pb-safe-nav {
+  /* Bottom nav height (4rem) + home indicator inset. */
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+@utility mb-safe-nav {
+  margin-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* iOS zooms any focused form control whose font-size is < 16px. Bump text
+   controls on phones so typing never triggers an auto-zoom jump. Unlayered
+   on purpose so it wins over Tailwind's text-sm utility. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  [contenteditable] {
+    font-size: 16px !important;
+  }
+}
+
+/* Keep toast tap targets clear of the mobile bottom navigation bars. */
+@media (max-width: 1023px) {
+  [data-sonner-toaster] {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;

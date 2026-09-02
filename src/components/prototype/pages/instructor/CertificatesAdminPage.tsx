@@ -414,7 +414,8 @@ export default function CertificatesAdminPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto custom-scrollbar">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -487,6 +488,64 @@ export default function CertificatesAdminPage() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  {/* Mobile card list — copy codes and revoke inline */}
+                  <div className="md:hidden space-y-3">
+                    {items.map((entry) => (
+                      <div key={entry.id} className="rounded-xl border bg-card p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium">{entry.learner.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{entry.learner.email}</p>
+                          </div>
+                          <Badge className={CERTIFICATE_STATUS_BADGES[entry.status].className}>
+                            {CERTIFICATE_STATUS_BADGES[entry.status].label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          Course: <span className="font-medium text-foreground/80">{entry.course.title}</span>
+                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono truncate">
+                              {entry.code}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-9 shrink-0"
+                              aria-label={`Copy certificate code ${entry.code}`}
+                              onClick={() => void handleCopyCode(entry)}
+                            >
+                              <Copy className="size-3.5" aria-hidden />
+                            </Button>
+                          </div>
+                          {entry.status === 'ACTIVE' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="min-h-11 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                setRevokeReason('');
+                                setRevokeTarget(entry);
+                              }}
+                            >
+                              <ShieldBan className="size-3.5 mr-1.5" aria-hidden />
+                              Revoke
+                            </Button>
+                          ) : (
+                            <span
+                              className="text-xs text-muted-foreground max-w-40 truncate"
+                              title={entry.revokedReason ?? undefined}
+                            >
+                              {entry.revokedReason ? entry.revokedReason : '—'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Issued {formatIssueDate(entry.issuedAt)}</p>
+                      </div>
+                    ))}
                   </div>
 
                   {nextCursor && (

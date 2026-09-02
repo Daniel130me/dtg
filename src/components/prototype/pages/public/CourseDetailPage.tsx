@@ -417,7 +417,7 @@ export default function CourseDetailPage() {
     <main className='flex-1'>
       {/* Back Button */}
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4'>
-        <Button variant='ghost' size='sm' asChild className='gap-1.5 text-muted-foreground hover:text-foreground'>
+        <Button variant='ghost' size='sm' asChild className='gap-1.5 text-muted-foreground hover:text-foreground h-11'>
           <Link href='/courses'>
             <ArrowLeft className='size-4' /> Back to Courses
           </Link>
@@ -698,6 +698,65 @@ export default function CourseDetailPage() {
           </div>
         </Card>
       </section>
+
+      {/* Sticky mobile enroll bar (lg:hidden): mirrors the desktop purchase
+          card's CTA logic (price + primary action) like a native product
+          page. The bottom nav is suppressed on this route (see
+          BottomNav.isSuppressedByPath), so nothing competes for this space. */}
+      <div
+        className='fixed bottom-0 inset-x-0 z-40 lg:hidden bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-t'
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        role='region'
+        aria-label='Enrolment actions'
+      >
+        <div className='max-w-7xl mx-auto px-4 flex items-center justify-between gap-3 py-3 min-h-[4.25rem]'>
+          <div className='min-w-0'>
+            <p className='text-xl font-bold leading-tight truncate'>
+              {formatPrice(course.priceMinor, course.currency)}
+            </p>
+            <p className='text-[11px] text-muted-foreground leading-tight'>30-day money-back guarantee</p>
+          </div>
+          {enrolmentState?.enrolled ? (
+            <Button size='lg' asChild className='shrink-0 min-h-11 px-6'>
+              <Link href={classroomHref ?? '/learning'}>Go to Classroom</Link>
+            </Button>
+          ) : reconciling ? (
+            <Button size='lg' disabled className='shrink-0 min-h-11 px-6'>
+              <Loader2 className='size-4 animate-spin' /> Verifying&hellip;
+            </Button>
+          ) : sessionPending || enrolmentLoading ? (
+            <Button size='lg' disabled className='shrink-0 min-h-11 px-6'>
+              {course.isFree ? 'Enroll' : 'Enroll Now'}
+            </Button>
+          ) : !signedInUserId ? (
+            <Button size='lg' onClick={() => router.push(loginWithReturnTo)} className='shrink-0 min-h-11 px-6'>
+              {course.isFree ? 'Enroll' : 'Enroll Now'}
+            </Button>
+          ) : course.isFree ? (
+            <Button size='lg' onClick={handleEnroll} disabled={enrolling} className='shrink-0 min-h-11 px-6'>
+              {enrolling ? (
+                <>
+                  <Loader2 className='size-4 animate-spin' /> Enrolling&hellip;
+                </>
+              ) : (
+                'Enroll'
+              )}
+            </Button>
+          ) : (
+            <Button size='lg' onClick={handleStartCheckout} disabled={startingCheckout} className='shrink-0 min-h-11 px-6'>
+              {startingCheckout ? (
+                <>
+                  <Loader2 className='size-4 animate-spin' /> Redirecting&hellip;
+                </>
+              ) : (
+                'Enroll Now'
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+      {/* Trailing spacer so the fixed enroll bar never covers page content. */}
+      <div aria-hidden className='lg:hidden' style={{ height: 'calc(4.25rem + env(safe-area-inset-bottom, 0px))' }} />
     </main>
   );
 }

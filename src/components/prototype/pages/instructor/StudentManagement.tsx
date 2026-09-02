@@ -433,7 +433,8 @@ export default function StudentManagement() {
             ) : (
               <Card>
                 <CardContent className="p-0">
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto custom-scrollbar">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -492,6 +493,45 @@ export default function StudentManagement() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  {/* Mobile card list — tap a card to open the detail dialog */}
+                  <div className="md:hidden divide-y">
+                    {items.map((student) => (
+                      <div
+                        key={student.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View ${student.name}`}
+                        onClick={() => openDetail(student)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openDetail(student);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-3.5 flex items-center gap-3 cursor-pointer transition-colors hover:bg-muted/30 active:bg-muted/50"
+                      >
+                        <div className="size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                          {initialsOf(student.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="font-medium text-sm truncate">{student.name}</p>
+                            <Badge variant={ACCOUNT_STATUS_BADGES[student.status].variant} className="shrink-0">
+                              {ACCOUNT_STATUS_BADGES[student.status].label}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatCount(student.enrolmentCount)}{' '}
+                            {student.enrolmentCount === 1 ? 'enrolment' : 'enrolments'} ·{' '}
+                            {student.lastActivityAt ? `active ${timeAgo(student.lastActivityAt)}` : 'never active'}
+                          </p>
+                        </div>
+                        <Eye className="size-4 text-muted-foreground shrink-0" aria-hidden />
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
