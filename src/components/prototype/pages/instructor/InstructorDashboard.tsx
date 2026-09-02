@@ -4,9 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Award,
+  Banknote,
   BookOpen,
   ClipboardCheck,
-  DollarSign,
   RefreshCw,
   Star,
   UserPlus,
@@ -300,7 +300,7 @@ export default function InstructorDashboard() {
                   label="Net Revenue"
                   value={formatMoney(analytics.totals.netRevenueMinor, analytics.totals.currency)}
                   subtext={`primary currency ${analytics.totals.currency}`}
-                  icon={<DollarSign className="size-5" />}
+                  icon={<Banknote className="size-5" />}
                   iconClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
                 />
                 <StatCard

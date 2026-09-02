@@ -92,18 +92,23 @@ export function computeCompletionRate(completed: number, inScope: number): numbe
 }
 
 /** Doc default when no payment has ever succeeded: the launch currency. */
-const DEFAULT_PRIMARY_CURRENCY = "USD";
+const DEFAULT_PRIMARY_CURRENCY = "NGN";
+
+function normalizePlatformCurrency(currency: string): string {
+  return currency === "USD" ? "NGN" : currency;
+}
 
 /**
  * Primary currency = the one with the highest count among the payment rows
  * the caller passes (the service passes SUCCEEDED payments, matching the
  * doc's "highest-volume currency"). Ties break lexicographically so the
- * winner never depends on row or insertion order; no rows -> "USD".
+ * winner never depends on row or insertion order; no rows -> "NGN".
  */
 export function pickPrimaryCurrency(payments: ReadonlyArray<{ currency: string }>): string {
   const counts = new Map<string, number>();
   for (const payment of payments) {
-    counts.set(payment.currency, (counts.get(payment.currency) ?? 0) + 1);
+    const normalizedCurrency = normalizePlatformCurrency(payment.currency);
+    counts.set(normalizedCurrency, (counts.get(normalizedCurrency) ?? 0) + 1);
   }
   // Sort keys first so the strict `>` below keeps the lexicographically
   // smallest currency on a tie, independent of Map iteration order.
@@ -150,7 +155,7 @@ function sumAmounts(
   primaryCurrency: string,
 ): number {
   return rows.reduce(
-    (total, row) => (row.currency === primaryCurrency ? total + row.amountMinor : total),
+    (total, row) => (normalizePlatformCurrency(row.currency) === primaryCurrency ? total + row.amountMinor : total),
     0,
   );
 }
