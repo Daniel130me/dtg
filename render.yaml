@@ -3,10 +3,11 @@ services:
     name: dtg-learning-platform
     runtime: node
     region: frankfurt
-    plan: 1c-2g
+    plan: free
+    # plan: 1c-2g
     branch: main
     buildCommand: npm ci --include=dev && npm run build
-    preDeployCommand: npm run db:migrate:deploy
+    # preDeployCommand: npm run db:migrate:deploy
     startCommand: npm start
     healthCheckPath: /api/v1/health/ready
     autoDeployTrigger: checksPass
@@ -24,8 +25,8 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
-      - key: TRUST_PROXY_HEADERS
-        value: "true"
+      - key: TRUSTED_PROXY_PROVIDER
+        value: cloudflare
       - key: RATE_LIMIT_SALT
         generateValue: true
       - key: BETTER_AUTH_SECRET
@@ -65,36 +66,36 @@ services:
       - key: ALLOW_OWNER_BOOTSTRAP
         value: "false"
 
-  - type: cron
-    name: dtg-outbox-dispatch
-    runtime: node
-    region: frankfurt
-    plan: 0.5c-512mb
-    branch: main
-    schedule: "* * * * *"
-    buildCommand: npm ci --include=dev && npm run db:generate
-    startCommand: npm run jobs:outbox
-    autoDeployTrigger: checksPass
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: APP_URL
-        sync: false
-      - key: DATABASE_URL
-        sync: false
-      - key: RATE_LIMIT_SALT
-        generateValue: true
-      - key: BETTER_AUTH_SECRET
-        generateValue: true
-      - key: LOG_LEVEL
-        value: info
-      - key: EMAIL_FROM
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
+  # - type: cron
+  #   name: dtg-outbox-dispatch
+  #   runtime: node
+  #   region: frankfurt
+  #   plan: 0.5c-512mb
+  #   branch: main
+  #   schedule: "* * * * *"
+  #   buildCommand: npm ci --include=dev && npm run db:generate
+  #   startCommand: npm run jobs:outbox
+  #   autoDeployTrigger: checksPass
+  #   envVars:
+  #     - key: NODE_ENV
+  #       value: production
+  #     - key: APP_URL
+  #       sync: false
+  #     - key: DATABASE_URL
+  #       sync: false
+  #     - key: RATE_LIMIT_SALT
+  #       generateValue: true
+  #     - key: BETTER_AUTH_SECRET
+  #       generateValue: true
+  #     - key: LOG_LEVEL
+  #       value: info
+  #     - key: EMAIL_FROM
+  #       sync: false
+  #     - key: SMTP_HOST
+  #       sync: false
+  #     - key: SMTP_PORT
+  #       value: "587"
+  #     - key: SMTP_USER
+  #       sync: false
+  #     - key: SMTP_PASSWORD
+  #       sync: false
