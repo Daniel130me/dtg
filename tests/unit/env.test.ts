@@ -13,7 +13,18 @@ describe("server environment", () => {
 
     assert.equal(env.PORT, 3000);
     assert.equal(env.DB_READINESS_TIMEOUT_MS, 10_000);
+    assert.equal(env.TRUSTED_PROXY_PROVIDER, undefined);
     assert.deepEqual(env.corsOrigins, new Set(["https://dtg.test", "https://admin.dtg.test"]));
+  });
+
+  it("accepts only the supported trusted proxy providers", () => {
+    assert.equal(
+      getServerEnv({ DATABASE_URL: databaseUrl, TRUSTED_PROXY_PROVIDER: "cloud-run" }).TRUSTED_PROXY_PROVIDER,
+      "cloud-run",
+    );
+    assert.throws(() =>
+      getServerEnv({ DATABASE_URL: databaseUrl, TRUSTED_PROXY_PROVIDER: "untrusted-proxy" }),
+    );
   });
 
   it("rejects non-PostgreSQL database URLs", () => {

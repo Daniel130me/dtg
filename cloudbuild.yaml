@@ -1,0 +1,54 @@
+substitutions:
+  _REGION: europe-west2
+  _REPOSITORY: dtg
+  _SERVICE: dtg-learning-platform
+  _MIGRATION_JOB: dtg-database-migrate
+  _OUTBOX_JOB: dtg-outbox-dispatch
+
+steps:
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --target=web
+      - "--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/web:${COMMIT_SHA}"
+      - .
+
+  - id: build-jobs
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --target=jobs
+      - "--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jobs:${COMMIT_SHA}"
+      - .
+
+  - id: push-web
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/web:${COMMIT_SHA}"
+
+  - id: push-jobs
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/jobs:${COMMIT_SHA}"
+
+  - id: migrate-and-deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - scripts/gcp/deploy.sh
+      - ${PROJECT_ID}
+      - ${_REGION}
+      - ${_REPOSITORY}
+      - ${COMMIT_SHA}
+      - ${_SERVICE}
+      - ${_MIGRATION_JOB}
+      - ${_OUTBOX_JOB}
+
+serviceAccount: projects/${PROJECT_ID}/serviceAccounts/dtg-cloud-build@${PROJECT_ID}.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

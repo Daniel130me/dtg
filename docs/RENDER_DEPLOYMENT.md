@@ -46,6 +46,9 @@ Use these values for the web service:
 | `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_WEBHOOK_HASH` | Set both for paid checkout, or leave both unset |
 | `OWNER_EMAIL` | The single instructor's normalized email address |
 
+The Blueprint sets `TRUSTED_PROXY_PROVIDER=cloudflare`. Do not copy the Cloud
+Run proxy setting into Render or accept caller-provided forwarding headers.
+
 For the cron service, enter the same `APP_URL`, Neon pooled `DATABASE_URL`, and SMTP values. The cron worker does not need R2 or the Neon direct URL.
 
 If the generated Render hostname differs from the origin initially entered, update `APP_URL` and `CORS_ORIGINS` immediately after creation and redeploy. Also configure the exact application origin in the R2 bucket CORS policy. Render supplies `PORT`; do not add or override it.

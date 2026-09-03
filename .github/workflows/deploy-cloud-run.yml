@@ -1,0 +1,85 @@
+name: Deploy Cloud Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Full 40-character SHA of a green main-branch CI run
+        required: true
+        type: string
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: cloud-run-production
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+    steps:
+      - name: Resolve the immutable deployment revision
+        id: revision
+        shell: bash
+        env:
+          AUTOMATIC_SHA: ${{ github.event.workflow_run.head_sha }}
+          MANUAL_SHA: ${{ inputs.commit_sha }}
+        run: |
+          sha="${AUTOMATIC_SHA:-$MANUAL_SHA}"
+          if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Deployment requires a full 40-character Git commit SHA." >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify a manual revision passed main-branch CI
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.revision.outputs.sha }}
+        run: |
+          successful_runs="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&status=completed&event=push&per_page=100" \
+            --jq '[.workflow_runs[] | select(.name == "CI" and .head_branch == "main" and .conclusion == "success")] | length')"
+          if [[ "$successful_runs" -lt 1 ]]; then
+            echo "The selected revision has no successful main-branch CI run." >&2
+            exit 1
+          fi
+
+      - name: Check out the verified commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.revision.outputs.sha }}
+
+      - name: Authenticate to Google Cloud without a service-account key
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Build, migrate, and deploy the verified commit
+        shell: bash
+        run: >-
+          gcloud builds submit
+          --project="${{ vars.GCP_PROJECT_ID }}"
+          --config=cloudbuild.yaml
+          --substitutions=COMMIT_SHA="${{ steps.revision.outputs.sha }}"
+          .

@@ -11,8 +11,8 @@ import packageJson from "../../../package.json";
 //
 // RELEASE_ID is declared in config/env.ts as the operator-facing knob; here it
 // is read once from the process environment and cached, falling back to the
-// Render's immutable commit SHA and then package.json, so every deployment has
-// a stable release identifier without requiring another copied secret.
+// Render's immutable commit SHA and then package.json. Cloud Run deployments
+// set RELEASE_ID to the immutable source commit in scripts/gcp/deploy.sh.
 // ---------------------------------------------------------------------------
 
 export interface ReleaseInfo {

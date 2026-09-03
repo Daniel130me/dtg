@@ -13,6 +13,7 @@ import {
 import { ApiError } from "@/server/http/errors";
 import { snapshotJson } from "@/server/observability/metrics";
 import { getReleaseInfo } from "@/server/observability/release";
+import { resolveTrustedClientIp } from "@/server/http/client-identity";
 
 // Phase 12 security suite (pure slices): the CSRF origin gate, the BOLA
 // resource-owner guard, mass-assignment rejection on the account contracts,
@@ -68,6 +69,40 @@ describe("CSRF origin gate (assertAllowedOrigin)", () => {
     assert.throws(
       () => assertAllowedOrigin(requestWithOrigin("https://dtg.example.evil.io")),
       (error: unknown) => error instanceof ApiError,
+    );
+  });
+});
+
+describe("trusted proxy client identity", () => {
+  it("uses only Cloudflare's provider-owned client header", () => {
+    const request = new Request("https://dtg.test", {
+      headers: {
+        "cf-connecting-ip": "203.0.113.10",
+        "x-forwarded-for": "198.51.100.20",
+      },
+    });
+    assert.equal(resolveTrustedClientIp(request, "cloudflare"), "203.0.113.10");
+    assert.equal(resolveTrustedClientIp(request, "none"), undefined);
+  });
+
+  it("uses Cloud Run's penultimate forwarded address and rejects invalid values", () => {
+    const request = new Request("https://dtg.test", {
+      headers: { "x-forwarded-for": "spoofed, 203.0.113.10, 35.191.0.1" },
+    });
+    assert.equal(resolveTrustedClientIp(request, "cloud-run"), "203.0.113.10");
+    assert.equal(
+      resolveTrustedClientIp(
+        new Request("https://dtg.test", { headers: { "x-forwarded-for": "203.0.113.10" } }),
+        "cloud-run",
+      ),
+      undefined,
+    );
+    assert.equal(
+      resolveTrustedClientIp(
+        new Request("https://dtg.test", { headers: { "cf-connecting-ip": "not-an-ip" } }),
+        "cloudflare",
+      ),
+      undefined,
     );
   });
 });

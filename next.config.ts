@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Cloud Run uses Next's minimal traced server image. Other deployment
+  // targets keep the standard `next start` output and remain unaffected.
+  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
   turbopack: {
     root: process.cwd(),
   },

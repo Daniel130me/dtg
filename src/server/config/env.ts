@@ -42,6 +42,7 @@ const serverEnvSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    TRUSTED_PROXY_PROVIDER: z.enum(["none", "cloudflare", "cloud-run"]).optional(),
     RATE_LIMIT_SALT: z.string().min(16).default("development-only-rate-limit-salt"),
     BETTER_AUTH_SECRET: z.string().min(32).default("development-only-auth-secret-change-me"),
     // Reserved for the one provisioned instructor; public sign-up rejects it.

@@ -3,6 +3,9 @@
 For the production release process, environment matrix, and CI/CD flow, see
 [Render production deployment](./RENDER_DEPLOYMENT.md).
 
+For the alternative Google Cloud deployment, see
+[Cloud Run production deployment](./GCP_CLOUD_RUN_DEPLOYMENT.md).
+
 ## Supported runtime
 
 - Node.js 24 LTS-compatible runtime
