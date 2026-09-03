@@ -20,6 +20,10 @@ services:
     maxShutdownDelaySeconds: 30
 
     envVars:
+      # Match the version used by CI and the verified Linux container build.
+      - key: NODE_VERSION
+        value: 24.14.1
+
       - key: NODE_ENV
         value: production
 
