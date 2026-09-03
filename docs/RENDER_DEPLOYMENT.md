@@ -133,9 +133,13 @@ migrations forward. Never run `prisma migrate reset` against Neon production.
 - **`.next/standalone` is missing:** redeploy the commit containing
   `NEXT_OUTPUT=standalone` in `render.yaml`.
 - **Prerender fails with internal `<meta>`, `<head>`, or viewport key
-  warnings:** confirm Render is building the latest commit with Node 24.14.1,
-  then choose **Manual Deploy → Clear build cache & deploy**. These warnings
-  originate in Next.js metadata rendering, not the keyed application lists.
+  warnings:** confirm `NODE_ENV` is exactly `production` (lowercase, without
+  quotes or surrounding spaces) and Render is building the latest commit with
+  Node 24.14.1. Remove any duplicate `NODE_ENV` entry, then choose **Manual
+  Deploy → Clear build cache & deploy**. The checked-in Next.js configuration
+  limits prerendering to four workers; the build log should no longer report
+  dozens of workers. These warnings originate in Next.js metadata rendering,
+  not the keyed application lists.
 - **Health check fails:** verify both Neon URLs and inspect the build/runtime
   logs; readiness must be able to query PostgreSQL.
 - **Port detection fails:** remove a manually configured `PORT`; retain
