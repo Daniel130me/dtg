@@ -15,6 +15,20 @@ const optionalEmail = z.preprocess(
   z.email().transform((value) => value.trim().toLowerCase()).optional(),
 );
 
+const corsOriginsValue = z.string().default("http://localhost:3000").superRefine(
+  (value, context) => {
+    for (const candidate of value.split(",").map((origin) => origin.trim()).filter(Boolean)) {
+      const parsed = z.url().safeParse(candidate);
+      if (!parsed.success || !["http:", "https:"].includes(new URL(candidate).protocol)) {
+        context.addIssue({
+          code: "custom",
+          message: `contains an invalid HTTP(S) origin: ${candidate}`,
+        });
+      }
+    }
+  },
+);
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -37,7 +51,7 @@ const serverEnvSchema = z
       }),
     DIRECT_URL: optionalUrl,
     TEST_DATABASE_URL: optionalUrl,
-    CORS_ORIGINS: z.string().default("http://localhost:3000"),
+    CORS_ORIGINS: corsOriginsValue,
     TRUST_PROXY_HEADERS: z
       .enum(["true", "false"])
       .default("false")
@@ -147,9 +161,10 @@ export function getServerEnv(
   const env: ServerEnv = {
     ...parsed.data,
     corsOrigins: new Set(
-      parsed.data.CORS_ORIGINS.split(",")
+      [parsed.data.APP_URL, ...parsed.data.CORS_ORIGINS.split(",")]
         .map((origin) => origin.trim())
-        .filter(Boolean),
+        .filter(Boolean)
+        .map((origin) => new URL(origin).origin),
     ),
   };
 

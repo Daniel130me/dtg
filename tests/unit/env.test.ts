@@ -8,13 +8,25 @@ describe("server environment", () => {
   it("parses safe defaults and comma-separated CORS origins", () => {
     const env = getServerEnv({
       DATABASE_URL: databaseUrl,
-      CORS_ORIGINS: "https://dtg.test, https://admin.dtg.test",
+      APP_URL: "https://dtg.test/",
+      CORS_ORIGINS: "https://dtg.test/, https://admin.dtg.test/settings",
     });
 
     assert.equal(env.PORT, 3000);
     assert.equal(env.DB_READINESS_TIMEOUT_MS, 10_000);
     assert.equal(env.TRUSTED_PROXY_PROVIDER, undefined);
     assert.deepEqual(env.corsOrigins, new Set(["https://dtg.test", "https://admin.dtg.test"]));
+  });
+
+  it("rejects invalid and non-HTTP CORS origins", () => {
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, CORS_ORIGINS: "not-a-url" }),
+      /invalid HTTP\(S\) origin/,
+    );
+    assert.throws(
+      () => getServerEnv({ DATABASE_URL: databaseUrl, CORS_ORIGINS: "javascript:alert(1)" }),
+      /invalid HTTP\(S\) origin/,
+    );
   });
 
   it("accepts only the supported trusted proxy providers", () => {

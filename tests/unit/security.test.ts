@@ -23,9 +23,11 @@ import { resolveTrustedClientIp } from "@/server/http/client-identity";
 // by the owner-ops/learning suites.
 
 const ORIGINAL_CORS = process.env.CORS_ORIGINS;
+const ORIGINAL_APP_URL = process.env.APP_URL;
 
 afterEach(() => {
   process.env.CORS_ORIGINS = ORIGINAL_CORS;
+  process.env.APP_URL = ORIGINAL_APP_URL;
   resetServerEnvForTests();
 });
 
@@ -47,6 +49,16 @@ describe("CSRF origin gate (assertAllowedOrigin)", () => {
     resetServerEnvForTests();
     assert.doesNotThrow(() => assertAllowedOrigin(requestWithOrigin("https://dtg.example")));
     assert.doesNotThrow(() => assertAllowedOrigin(requestWithOrigin("https://admin.dtg.example")));
+  });
+
+  it("allows the canonical application origin when a deployment allowlist is stale", () => {
+    process.env.APP_URL = "https://app.example.test/";
+    process.env.CORS_ORIGINS = "http://localhost:3000";
+    resetServerEnvForTests();
+
+    assert.doesNotThrow(() =>
+      assertAllowedOrigin(requestWithOrigin("https://app.example.test")),
+    );
   });
 
   it("rejects foreign origins with 403 ORIGIN_NOT_ALLOWED (cross-site form/fetch)", () => {
