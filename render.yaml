@@ -4,98 +4,64 @@ services:
     runtime: node
     region: frankfurt
     plan: free
-    # plan: 1c-2g
     branch: main
-    buildCommand: npm ci --include=dev && npm run build
-    # preDeployCommand: npm run db:migrate:deploy
+
+    buildCommand: npm ci --include=dev && npm run db:migrate:deploy && npm run build && cp -r public .next/standalone/ && mkdir -p .next/standalone/.next && cp -r .next/static .next/standalone/.next/
+
     startCommand: npm start
+
     healthCheckPath: /api/v1/health/ready
-    autoDeployTrigger: checksPass
+
     maxShutdownDelaySeconds: 30
+
     envVars:
       - key: NODE_ENV
         value: production
+
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+
       - key: APP_URL
         sync: false
+
       - key: DATABASE_URL
         sync: false
+
       - key: DIRECT_URL
         sync: false
+
       - key: CORS_ORIGINS
         sync: false
-      - key: TRUSTED_PROXY_PROVIDER
-        value: cloudflare
+
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+
       - key: RATE_LIMIT_SALT
         generateValue: true
+
       - key: BETTER_AUTH_SECRET
         generateValue: true
+
       - key: DB_READINESS_TIMEOUT_MS
         value: "4000"
+
       - key: LOG_LEVEL
         value: info
+
       - key: METRICS_ENABLED
         value: "true"
+
       - key: R2_BUCKET
         sync: false
+
       - key: R2_S3_ENDPOINT
         sync: false
+
       - key: R2_PUBLIC_BASE_URL
         sync: false
+
       - key: R2_ACCESS_KEY_ID
         sync: false
+
       - key: R2_SECRET_ACCESS_KEY
         sync: false
-      - key: EMAIL_FROM
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: FLUTTERWAVE_SECRET_KEY
-        sync: false
-      - key: FLUTTERWAVE_WEBHOOK_HASH
-        sync: false
-      - key: OWNER_EMAIL
-        sync: false
-      - key: ALLOW_OWNER_BOOTSTRAP
-        value: "false"
-
-  # - type: cron
-  #   name: dtg-outbox-dispatch
-  #   runtime: node
-  #   region: frankfurt
-  #   plan: 0.5c-512mb
-  #   branch: main
-  #   schedule: "* * * * *"
-  #   buildCommand: npm ci --include=dev && npm run db:generate
-  #   startCommand: npm run jobs:outbox
-  #   autoDeployTrigger: checksPass
-  #   envVars:
-  #     - key: NODE_ENV
-  #       value: production
-  #     - key: APP_URL
-  #       sync: false
-  #     - key: DATABASE_URL
-  #       sync: false
-  #     - key: RATE_LIMIT_SALT
-  #       generateValue: true
-  #     - key: BETTER_AUTH_SECRET
-  #       generateValue: true
-  #     - key: LOG_LEVEL
-  #       value: info
-  #     - key: EMAIL_FROM
-  #       sync: false
-  #     - key: SMTP_HOST
-  #       sync: false
-  #     - key: SMTP_PORT
-  #       value: "587"
-  #     - key: SMTP_USER
-  #       sync: false
-  #     - key: SMTP_PASSWORD
-  #       sync: false
