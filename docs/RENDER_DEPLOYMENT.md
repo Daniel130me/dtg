@@ -1,118 +1,145 @@
-# Render production deployment
+# Render Free live-test deployment
 
-This release deploys as two Render services in Frankfurt:
+This is the simplest way to put DTG online temporarily: one Render **Free Web
+Service**, Neon for PostgreSQL, and Cloudflare R2 for media. The checked-in
+Cloud Run files remain available for the later production deployment.
 
-- `dtg-learning-platform`: the Next.js web service, with readiness-gated deploys and Neon migrations in Render's pre-deploy step.
-- `dtg-outbox-dispatch`: a one-minute cron job that sends queued email and in-app notifications. Each run is bounded, retries failed work, and recovers abandoned processing leases.
+## 1. Free-plan limitations
 
-Neon remains the system of record and Cloudflare R2 remains the media store. Render does not receive a local PostgreSQL disk or persistent upload directory.
+Use this deployment for testing, not a production launch:
 
-## 1. Rotate exposed credentials
+- the service sleeps after 15 minutes without inbound traffic, so its first
+  request after sleeping is slow;
+- the filesystem is ephemeral, so all durable data must stay in Neon or R2;
+- Render Free blocks outbound SMTP ports 25, 465, and 587, so Gmail signup
+  verification, password-reset email, and notification email cannot be tested;
+- Free services have no pre-deploy command or Shell; migrations therefore run
+  as the final build step;
+- no Render cron job is included. Outbox email dispatch remains disabled for
+  this test and can be added with the later production infrastructure.
 
-Before deployment, revoke and recreate every database password, R2 API token, and Gmail app password that has ever been pasted into a chat, screenshot, issue, or log. Do not reuse those values. Store the replacements only in Neon, Cloudflare, Google, and Render's encrypted environment settings.
+Do not add Gmail credentials to this Free service. Use an existing verified
+student account and the existing owner account for the live test. Do not weaken
+email verification or expose reset links merely to work around a hosting-plan
+restriction.
 
-The R2 token should have Object Read & Write access to the `dtg` bucket only. The application needs the R2 S3 API endpoint for signing requests and a separate public Worker or custom-domain URL for delivery.
+## 2. Protect credentials
 
-## 2. Prepare GitHub
+Revoke and recreate any Neon password or R2 token that has appeared in chat,
+screenshots, issues, or logs. Never commit secrets. The R2 token should have
+Object Read & Write access to the `dtg` bucket only.
 
-1. Push the repository to GitHub and confirm the `CI` workflow passes on `main`.
-2. In GitHub, open **Settings → Branches → Add branch protection rule** for `main`.
-3. Require pull requests and the `verify` status check before merge. Prevent force pushes and branch deletion.
+- `DATABASE_URL`: Neon pooled URL for application traffic.
+- `DIRECT_URL`: Neon direct URL for Prisma migrations.
+- `R2_S3_ENDPOINT`: `https://<account-id>.r2.cloudflarestorage.com`.
+- `R2_PUBLIC_BASE_URL`: the separate Worker or public delivery origin.
 
-Render is configured with `autoDeployTrigger: checksPass`, so a failing or missing GitHub check prevents a production deploy.
+## 3. Push the prepared commit
 
-## 3. Create the Render Blueprint
+Push the prepared revision to GitHub and confirm the repository's `CI` workflow
+passes on `main`. The Blueprint uses `autoDeployTrigger: checksPass`, so later
+deploys wait for GitHub checks to pass.
+
+## 4. Create one Free web service
 
 1. Sign in to Render and choose **New → Blueprint**.
-2. Connect the GitHub repository and select the `main` branch.
-3. Render detects `render.yaml`. Review the two services and apply the Blueprint.
-4. Enter every value marked `sync: false`. Render prompts for these during the first Blueprint creation; it never stores their plaintext in the repository.
+2. Connect the GitHub repository containing this project.
+3. Select the `main` branch. Render detects the root `render.yaml`.
+4. Confirm there is exactly one service named `dtg-learning-platform`, with
+   type **Web Service**, region Frankfurt, and plan **Free**.
+5. Enter every value Render requests using the table below.
+6. Apply the Blueprint and watch the Events/build logs until it reports Live.
 
-Use these values for the web service:
+Do not create a Static Site, Background Worker, Cron Job, PostgreSQL service,
+or persistent disk for this live test.
+
+## 5. Environment values
+
+Enter values without surrounding quotation marks.
 
 | Variable | Value |
 | --- | --- |
-| `APP_URL` | The final HTTPS Render or custom-domain origin, with no path |
-| `DATABASE_URL` | Neon pooled connection URL for application traffic |
-| `DIRECT_URL` | Neon direct connection URL for migrations |
-| `CORS_ORIGINS` | The same exact HTTPS origin as `APP_URL`; comma-separate any additional trusted origins |
+| `APP_URL` | Initially `https://dtg-learning-platform.onrender.com`; correct it if Render assigns a different hostname |
+| `DATABASE_URL` | Neon pooled production URL |
+| `DIRECT_URL` | Neon direct production URL |
+| `CORS_ORIGINS` | Exactly the same origin as `APP_URL`, without a trailing slash |
+| `OWNER_EMAIL` | The single instructor's normalized email address |
 | `R2_BUCKET` | `dtg` |
 | `R2_S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` |
-| `R2_PUBLIC_BASE_URL` | The HTTPS Worker or custom-domain delivery origin |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | The new bucket-scoped R2 token credentials |
-| `EMAIL_FROM` | A valid sender such as `DTG <owner@example.com>` |
-| `SMTP_HOST`, `SMTP_PORT` | Gmail uses `smtp.gmail.com` and port `587` |
-| `SMTP_USER`, `SMTP_PASSWORD` | SMTP account and newly generated app password |
-| `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_WEBHOOK_HASH` | Set both for paid checkout, or leave both unset |
-| `OWNER_EMAIL` | The single instructor's normalized email address |
+| `R2_PUBLIC_BASE_URL` | HTTPS Worker or custom delivery origin |
+| `R2_ACCESS_KEY_ID` | New bucket-scoped R2 access-key ID |
+| `R2_SECRET_ACCESS_KEY` | New bucket-scoped R2 secret key |
 
-The Blueprint sets `TRUSTED_PROXY_PROVIDER=cloudflare`. Do not copy the Cloud
-Run proxy setting into Render or accept caller-provided forwarding headers.
+The Blueprint supplies `NODE_ENV`, standalone Next.js output, secure generated
+application secrets, `HOSTNAME=0.0.0.0`, and
+`TRUSTED_PROXY_PROVIDER=render`. Render supplies `PORT`; do not set it.
 
-For the cron service, enter the same `APP_URL`, Neon pooled `DATABASE_URL`, and SMTP values. The cron worker does not need R2 or the Neon direct URL.
+If the assigned hostname differs from `APP_URL`, open **Service → Environment**,
+update both `APP_URL` and `CORS_ORIGINS`, save them, and choose **Manual Deploy
+→ Deploy latest commit**. Add that exact origin to the R2 bucket CORS policy.
 
-If the generated Render hostname differs from the origin initially entered, update `APP_URL` and `CORS_ORIGINS` immediately after creation and redeploy. Also configure the exact application origin in the R2 bucket CORS policy. Render supplies `PORT`; do not add or override it.
+Leave SMTP and Flutterwave variables unset for this test. Partial SMTP or
+Flutterwave configuration intentionally prevents the app from booting.
 
-## 4. Verify the first release
+## 6. Deployment sequence
 
-The web deployment order is deliberate:
+The Blueprint runs this sequence:
 
-1. install locked dependencies and build;
-2. apply committed Prisma migrations through the Neon direct URL;
-3. start Next.js on Render's assigned port;
-4. pass `/api/v1/health/ready` before receiving traffic.
+1. install locked dependencies;
+2. build the standalone Next.js server and copy its public/static assets;
+3. run committed Prisma migrations against `DIRECT_URL`;
+4. start on Render's assigned `PORT` and `0.0.0.0`;
+5. check `/api/v1/health/ready` before marking the service healthy.
 
-The Blueprint bounds the database readiness probe to four seconds so it
-finishes within Render's five-second health-check response window.
+The migration runs only after a successful compile. A migration failure stops
+the deployment. Unlike a paid pre-deploy command, a successful migration can
+remain applied if a later service start fails. Migrations must therefore remain
+backward-compatible, as required by `docs/MIGRATION_RUNBOOK.md`.
 
-After the service reports **Live**, run the read-only smoke suite locally:
+Free has no Shell. If a fresh database needs its first owner, run
+`npm run owner:bootstrap` locally against that Neon database using the guarded
+bootstrap variables documented in `docs/BACKEND_SETUP.md`, then remove those
+temporary variables. The command refuses to create a second owner.
 
-```bash
-npm run smoke -- https://your-service.onrender.com
-```
+## 7. Verify the deployment
 
-Confirm all checks pass, then test these user journeys with non-production test accounts:
-
-1. sign-up verification and forgot-password email;
-2. owner login, profile settings, course creation, and direct video upload;
-3. student enrolment, lesson playback, progress, Q&A, and owner reply;
-4. payment webhook fulfilment if Flutterwave is enabled;
-5. notification delivery and a successful `dtg-outbox-dispatch` cron run.
-
-## 5. Provision the single owner if required
-
-Only do this for a new database with no configured owner. Open the web service's Render Shell, temporarily set `ALLOW_OWNER_BOOTSTRAP=true` plus `OWNER_DISPLAY_NAME` and a password-manager-generated `OWNER_PASSWORD`, then run:
+After Render reports **Live**, run:
 
 ```bash
-npm run owner:bootstrap
+npm run smoke -- https://your-actual-service.onrender.com
 ```
 
-Immediately remove `OWNER_PASSWORD` and `OWNER_DISPLAY_NAME`, restore `ALLOW_OWNER_BOOTSTRAP=false`, and redeploy. The command refuses to create a second owner once platform ownership exists.
+All nine checks must pass. Then use the existing verified test accounts to:
 
-## 6. Normal CI/CD operation
+1. sign in as owner and open owner settings;
+2. create a draft course, add curriculum, and upload a lecture video;
+3. enrol the verified student and play the uploaded lesson;
+4. post a student Q&A item and answer it as owner.
 
-For every change:
+Signup verification, forgot-password email, notification email, and paid
+checkout are outside this Free live test. Test them locally with SMTP or later
+on infrastructure that supports the required delivery provider.
 
-1. open a pull request;
-2. wait for lint, type checking, tests, a clean migration against PostgreSQL 17, and the production build;
-3. merge only after review and a green `verify` check;
-4. Render automatically builds the approved commit, applies migrations, and replaces the web instance only after readiness passes.
+## 8. Releases and rollback
 
-Use backward-compatible, expand-and-contract migrations. Application rollback does not reverse a database migration. If a release is unhealthy, use Render's rollback to restore the prior application build, then ship a forward database correction rather than running destructive rollback SQL.
-
-## 7. Production operations
-
-- Use the configured paid web plan for production; free instances can sleep and are not suitable for this launch.
-- Watch both service logs during and after every release. A non-zero cron exit signals a dispatch failure that needs investigation.
-- Monitor `/api/v1/health/ready`; keep `/api/v1/health/diagnostics` and `/api/v1/metrics` owner-authenticated.
-- Logs automatically use Render's `RENDER_GIT_COMMIT` as the release ID; an explicit `RELEASE_ID` can override it.
-- Add the custom domain in Render before changing `APP_URL`, `CORS_ORIGINS`, R2 CORS, payment callbacks, or email links to that domain.
-- Back up Neon independently and rehearse the recovery runbook before launch.
+For each change, open a pull request, wait for CI, review, and merge. Render
+automatically deploys the passing `main` revision. If a release is unhealthy,
+use **Service → Deploys → Rollback** for application code and fix database
+migrations forward. Never run `prisma migrate reset` against Neon production.
 
 ## Troubleshooting
 
-- **Build succeeds but the service never becomes healthy:** inspect the Render logs for invalid environment configuration, then verify both Neon URLs and `/api/v1/health/ready`.
-- **Authentication redirects to localhost or the wrong host:** correct `APP_URL`, `CORS_ORIGINS`, and the custom-domain DNS, then redeploy.
-- **Uploads fail:** confirm `R2_S3_ENDPOINT` is the S3 API hostname, not the Worker delivery URL, and confirm the token is scoped to the `dtg` bucket.
-- **Emails do not arrive:** inspect the cron logs, verify all four SMTP fields plus `EMAIL_FROM`, and confirm the Gmail app password is current.
-- **A Blueprint gains a new `sync: false` variable later:** add it manually to each existing service; subsequent Blueprint syncs do not prompt for newly added secret values.
+- **`.next/standalone` is missing:** redeploy the commit containing
+  `NEXT_OUTPUT=standalone` in `render.yaml`.
+- **Health check fails:** verify both Neon URLs and inspect the build/runtime
+  logs; readiness must be able to query PostgreSQL.
+- **Port detection fails:** remove a manually configured `PORT`; retain
+  `HOSTNAME=0.0.0.0`.
+- **Uploads fail:** use the R2 S3 endpoint for signing, the Worker URL only for
+  public delivery, and allow the exact Render origin in R2 CORS.
+- **Emails do not arrive:** this is expected on Render Free because SMTP ports
+  are blocked. Do not repeatedly rotate valid Gmail credentials for this error.
+- **Auth links or redirects use localhost:** update `APP_URL` and
+  `CORS_ORIGINS` together, then redeploy.
+- **A new `sync: false` variable is added later:** add it manually to the
+  existing service because Blueprint sync does not prompt again.

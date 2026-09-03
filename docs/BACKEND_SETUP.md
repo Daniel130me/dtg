@@ -23,7 +23,9 @@ Use `npm ci` for repeatable installs. Bun is not required by application scripts
 4. Use a separate database or Neon branch for `TEST_DATABASE_URL`. Never point integration tests at production.
 5. Generate independent random values for `RATE_LIMIT_SALT` and `BETTER_AUTH_SECRET`; do not reuse passwords or provider secrets.
 6. Configure `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASSWORD` together so verification and recovery emails can be delivered.
-7. Set `TRUST_PROXY_HEADERS=true` only when requests are guaranteed to arrive through the trusted Cloudflare proxy.
+7. Set `TRUSTED_PROXY_PROVIDER` to `render` on Render, `cloud-run` on Google
+   Cloud Run, `cloudflare` only behind a direct Cloudflare edge, and `none`
+   locally. `TRUST_PROXY_HEADERS` is a legacy compatibility setting.
 8. Keep `DB_READINESS_TIMEOUT_MS` at `10000` for Neon unless production latency measurements justify a different bounded value.
 9. Leave R2 variables empty until media uploads are enabled.
 

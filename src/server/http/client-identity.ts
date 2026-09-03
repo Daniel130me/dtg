@@ -4,7 +4,7 @@ import { getServerEnv } from "@/server/config/env";
 
 const MAX_SOURCE_LENGTH = 255;
 
-export type TrustedProxyProvider = "none" | "cloudflare" | "cloud-run";
+export type TrustedProxyProvider = "none" | "cloudflare" | "render" | "cloud-run";
 
 function validIp(value: string | undefined): string | undefined {
   const candidate = value?.trim();
@@ -22,6 +22,14 @@ export function resolveTrustedClientIp(
 ): string | undefined {
   if (provider === "cloudflare") {
     return validIp(request.headers.get("cf-connecting-ip") ?? undefined);
+  }
+
+  if (provider === "render") {
+    // Render guarantees that its edge writes the real client address first.
+    // Inspect exactly that position; skipping an invalid first item could
+    // accidentally promote a caller-controlled value later in the chain.
+    const firstAddress = request.headers.get("x-forwarded-for")?.split(",", 1)[0];
+    return validIp(firstAddress);
   }
 
   if (provider === "cloud-run") {

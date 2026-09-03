@@ -85,6 +85,22 @@ describe("trusted proxy client identity", () => {
     assert.equal(resolveTrustedClientIp(request, "none"), undefined);
   });
 
+  it("uses only Render's first forwarded address", () => {
+    const request = new Request("https://dtg.test", {
+      headers: { "x-forwarded-for": "203.0.113.10, 198.51.100.20" },
+    });
+    assert.equal(resolveTrustedClientIp(request, "render"), "203.0.113.10");
+    assert.equal(
+      resolveTrustedClientIp(
+        new Request("https://dtg.test", {
+          headers: { "x-forwarded-for": "invalid, 203.0.113.10" },
+        }),
+        "render",
+      ),
+      undefined,
+    );
+  });
+
   it("uses Cloud Run's penultimate forwarded address and rejects invalid values", () => {
     const request = new Request("https://dtg.test", {
       headers: { "x-forwarded-for": "spoofed, 203.0.113.10, 35.191.0.1" },

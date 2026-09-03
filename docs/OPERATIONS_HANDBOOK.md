@@ -19,9 +19,9 @@ drift. If a threshold changes in code, change the citation in the same commit.
 | Database | PostgreSQL (Neon in production) via Prisma ORM | Pooled URL for traffic (`DATABASE_URL`), direct URL for migrations (`DIRECT_URL`) |
 | Auth | Better Auth (email/password, Argon2 hashes, session cookies) | Sessions expire in 7 days, refreshed daily (see `docs/PRIVACY.md` §1) |
 | Payments | Flutterwave (secret key + webhook hash) | Optional at boot; both halves required together (see §3) |
-| Email | SMTP via Nodemailer | Optional at boot; dev falls back to structured log delivery |
+| Email | SMTP via Nodemailer | Optional at boot; absent configuration disables delivery safely |
 | Object storage | Cloudflare R2 | Direct thumbnail uploads and private multipart lecture-video uploads; assignment attachments remain a documented seam (`docs/RECOVERY_RUNBOOK.md` §3) |
-| Runtime shape | Cloud Run web service plus migration/outbox jobs; Render remains a supported fallback | Primary delivery is in `docs/GCP_CLOUD_RUN_DEPLOYMENT.md`; Render steps remain in `docs/RENDER_DEPLOYMENT.md` |
+| Runtime shape | One Render Free web service for the temporary live test; Cloud Run remains prepared for the later production move | Current test steps and Free-tier limitations are in `docs/RENDER_DEPLOYMENT.md`; the later GCP path remains in `docs/GCP_CLOUD_RUN_DEPLOYMENT.md` |
 
 **Request path:** browser → Next.js route handler (`executeRoute` wrapper:
 request id, structured log line, metrics sample, rate limiting, Zod validation)
@@ -50,11 +50,11 @@ requests (`assertAllowedOrigin`, covered by `tests/unit/security.test.ts`).
 
 ### 2.2 Deploy sequence
 
-Cloud Build executes the production sequence declared in `cloudbuild.yaml`:
-build immutable web/job images, run the migration job, deploy the web service,
-then configure the outbox job. See `docs/GCP_CLOUD_RUN_DEPLOYMENT.md` for the
-beginner setup and first-deploy guide. Render remains deployable from
-`render.yaml`; its separate guide documents that fallback.
+Render executes the current live-test sequence declared in `render.yaml`: build
+the standalone application, apply migrations as the final build step, start
+the web service, and gate traffic on database readiness. See
+`docs/RENDER_DEPLOYMENT.md`. The Cloud Build configuration remains available
+for the later move to Google Cloud Run.
 
 ```bash
 # 1. Pre-flight (fails the deploy on drift/pending migrations)
@@ -120,7 +120,7 @@ Validation is centralized in `src/server/config/env.ts` (Zod). The process
 | HTTP security | `CORS_ORIGINS`, `TRUSTED_PROXY_PROVIDER`, `RATE_LIMIT_SALT`, `BETTER_AUTH_SECRET` | Select the actual hosting proxy; salt/secret must not match development placeholders |
 | Observability | `RELEASE_ID` (falls back to package version), `METRICS_ENABLED` (default true; gates `/metrics` endpoint, collection stays on) | |
 | R2 | `R2_BUCKET`, `R2_S3_ENDPOINT`, `R2_PUBLIC_BASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Optional; media features degrade until configured. `R2_S3_ENDPOINT` must use `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`; the public Worker/custom domain belongs in `R2_PUBLIC_BASE_URL`. |
-| SMTP | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | All-or-nothing: partial config fails boot; absent config = logged mail delivery |
+| SMTP | `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | All-or-nothing: partial config fails boot; absent config disables delivery safely |
 | Flutterwave | `FLUTTERWAVE_SECRET_KEY`, `FLUTTERWAVE_WEBHOOK_HASH` | All-or-nothing: partial config fails boot (prevents paid checkout without verifiable webhooks) |
 
 Browser-to-R2 thumbnail and multipart lecture uploads also require a bucket
@@ -150,8 +150,9 @@ The public Worker/custom domain must allow only thumbnail object prefixes; it
 must deny `courses/*/lessons/*`. Do not attach an unrestricted public domain to
 the bucket, because paid lecture playback depends on signed S3 GET URLs.
 
-Set `TRUSTED_PROXY_PROVIDER` to the actual hosting edge (`cloudflare` for
-Render or `cloud-run` for Google Cloud Run). Use `none` locally. The legacy
+Set `TRUSTED_PROXY_PROVIDER` to the actual hosting edge (`render` for Render,
+`cloudflare` for a direct Cloudflare-hosted edge, or `cloud-run` for Google
+Cloud Run). Use `none` locally. The legacy
 `TRUST_PROXY_HEADERS` boolean remains for compatibility but must not be used
 for new deployments.
 
@@ -238,7 +239,7 @@ every business-day shift (§7 duty checklist).
 
 | Cadence | Task | How |
 | --- | --- | --- |
-| Every minute (scheduler) | Outbox dispatch (notifications + emails + contact-body purge piggyback) | Cloud Scheduler executes the `dtg-outbox` Cloud Run job; Render cron is the fallback. Leases and dedupe keys make retries safe. |
+| Every minute (scheduler) | Outbox dispatch (notifications + emails + contact-body purge piggyback) | Not scheduled on the temporary Free test. Add a production scheduler before real users arrive; Cloud Scheduler is prepared for the GCP move. |
 | Daily (or per scrape) | Alert check | §4.3 |
 | Weekly | `bunx prisma migrate status` on production (expect: no pending) | CI gate also enforces per deploy |
 | Quarterly | Backup posture re-verify | `docs/RECOVERY_RUNBOOK.md` §2 |
@@ -315,11 +316,15 @@ documentation.
 | Area | State | Consequence / seam |
 | --- | --- | --- |
 | R2 assignment attachments | Not implemented | Course thumbnails and lecture videos are implemented; assignment attachments remain a documented seam (`docs/RECOVERY_RUNBOOK.md` §3) |
-| SMTP | Optional at boot | Unset = emails logged, not sent; suppression list still honored |
+| SMTP | Optional at boot | Unset = delivery disabled safely; Render Free blocks SMTP, so email flows are excluded from this test |
 | Flutterwave | Optional at boot | Unset = checkout disabled; set both key + hash or the process refuses to start |
 | External alert channel | Worker is an external seam | §4.3 defines the scrape contract; until wired, manual shift checks (§7) |
 | Error monitoring | In-repo (logger + error monitor + `/metrics`) | Sentry/OTel collector attachment is a config-time seam, documented here; no PII leaves the process by default (PII redaction per `docs/PRIVACY.md` §2) |
 | Load/security tests | Offline suites, not CI load runs | Run before launch against a production-like dataset; thresholds in file headers |
-| Outbox dispatcher | Cloud Scheduler executes a bounded Cloud Run job every minute; Render cron remains supported | Monitor job exits and outbox lag; the owner endpoint remains an emergency manual trigger |
+| Outbox dispatcher | Not scheduled on the Render Free live test | Add a supported production scheduler before real users arrive; the owner endpoint remains an emergency manual trigger |
 
-Deployment status (2026-09-02): the production Neon project is wired (`DATABASE_URL` pooled / `DIRECT_URL` direct), R2 (bucket `dtg`) and SMTP (Gmail, port 587 STARTTLS) are configured and verified end-to-end via `scripts/verify-r2.ts` (S3 round-trip + public `r2.dev` delivery) and `scripts/verify-smtp.ts` (auth + one labelled test email). Flutterwave and the external alert channel remain the open seams.
+Deployment status (2026-09-03): Neon (`DATABASE_URL` pooled /
+`DIRECT_URL` direct) and R2 (bucket `dtg`) are wired. SMTP was verified locally,
+but is deliberately omitted from the Render Free service because that plan
+blocks SMTP ports. Flutterwave, scheduled outbox dispatch, and the external
+alert channel remain outside the temporary live test.

@@ -56,8 +56,9 @@ apply and verify:
 ### 4.1 Point-in-time restore (primary path)
 
 1. Freeze writes: suspend the active outbox scheduler (Google Cloud Scheduler
-   for Cloud Run, or the Render `dtg-outbox-dispatch` cron job), then put the
-   web service into maintenance or otherwise stop application writes.
+   for Cloud Run, or the optional Render `dtg-outbox-dispatch` cron job if it
+   has been provisioned), then put the web service into maintenance or
+   otherwise stop application writes.
 2. Neon console → production branch → **Restore** → choose the timestamp
    (inside the PITR window). Neon creates a NEW branch at that point in time.
 3. Note the restore branch connection strings (direct + pooled).

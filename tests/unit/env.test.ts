@@ -22,6 +22,10 @@ describe("server environment", () => {
       getServerEnv({ DATABASE_URL: databaseUrl, TRUSTED_PROXY_PROVIDER: "cloud-run" }).TRUSTED_PROXY_PROVIDER,
       "cloud-run",
     );
+    assert.equal(
+      getServerEnv({ DATABASE_URL: databaseUrl, TRUSTED_PROXY_PROVIDER: "render" }).TRUSTED_PROXY_PROVIDER,
+      "render",
+    );
     assert.throws(() =>
       getServerEnv({ DATABASE_URL: databaseUrl, TRUSTED_PROXY_PROVIDER: "untrusted-proxy" }),
     );
