@@ -70,9 +70,8 @@ Enter values without surrounding quotation marks.
 | `R2_ACCESS_KEY_ID` | New bucket-scoped R2 access-key ID |
 | `R2_SECRET_ACCESS_KEY` | New bucket-scoped R2 secret key |
 
-The Blueprint supplies the verified `NODE_VERSION=24.14.1`, `NODE_ENV`,
-standalone Next.js output, secure generated application secrets,
-`HOSTNAME=0.0.0.0`, and
+The Blueprint supplies the verified `NODE_VERSION=24.14.1`, `NODE_ENV`, secure
+generated application secrets, `HOSTNAME=0.0.0.0`, and
 `TRUSTED_PROXY_PROVIDER=render`. Render supplies `PORT`; do not set it.
 
 If the assigned hostname differs from `APP_URL`, open **Service → Environment**,
@@ -130,8 +129,9 @@ migrations forward. Never run `prisma migrate reset` against Neon production.
 
 ## Troubleshooting
 
-- **`.next/standalone` is missing:** redeploy the commit containing
-  `NEXT_OUTPUT=standalone` in `render.yaml`.
+- **`.next/standalone` is missing:** confirm Render built the latest commit,
+  then choose **Manual Deploy → Clear build cache & deploy**. Standalone output
+  is generated unconditionally by the checked-in Next.js configuration.
 - **Prerender fails with internal `<meta>`, `<head>`, or viewport key
   warnings:** confirm `NODE_ENV` is exactly `production` (lowercase, without
   quotes or surrounding spaces) and Render is building the latest commit with

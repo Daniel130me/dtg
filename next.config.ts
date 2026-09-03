@@ -5,9 +5,10 @@ import type { NextConfig } from "next";
 const BUILD_WORKER_COUNT = 4;
 
 const nextConfig: NextConfig = {
-  // Cloud Run uses Next's minimal traced server image. Other deployment
-  // targets keep the standard `next start` output and remain unaffected.
-  output: process.env.NEXT_OUTPUT === "standalone" ? "standalone" : undefined,
+  // Render and Cloud Run both start the minimal traced production server.
+  // Keeping this unconditional guarantees the start artifact exists after
+  // every production build, including manually configured deployments.
+  output: "standalone",
   turbopack: {
     root: process.cwd(),
   },

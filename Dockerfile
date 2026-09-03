@@ -11,8 +11,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM base AS builder
-ENV NEXT_TELEMETRY_DISABLED=1 \
-    NEXT_OUTPUT=standalone
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 # These non-production placeholders only satisfy build-time validation. Keeping
