@@ -3,11 +3,16 @@ import {
   COURSE_NOT_ENROLLED,
   LESSON_NOT_ACCESSIBLE,
   LESSON_NOT_FOUND,
+  THREAD_NOT_ACTIVE,
+  ownerThreadListQuerySchema,
   replyListQuerySchema,
   threadListQuerySchema,
   type DiscussionPostDto,
   type DiscussionStatusValue,
   type DiscussionThreadSummaryDto,
+  type OwnerThreadDetailDto,
+  type OwnerThreadSummaryDto,
+  type PaginatedOwnerThreadsDto,
   type PaginatedThreadsDto,
   type ThreadDetailDto,
 } from "@/contracts/learning";
@@ -24,7 +29,10 @@ import {
 // Authorization model: learner discussion reads/writes resolve through
 // requireAuthenticatedUser(headers); access to a lesson's Q&A is granted by
 // the shared assertDiscussionAccess helper below. Owner moderation routes go
-// through requireOwner(headers) before reaching setThreadStatus/setPostStatus.
+// through requireOwner(headers) before reaching setThreadStatus/setPostStatus,
+// and the owner Q&A console (listOwnerThreads/getOwnerThread/replyAsOwner)
+// likewise sits behind requireOwner — it deliberately skips the learner
+// access rule so the owner can read and answer every course's questions.
 
 // One select for every thread read: the summary DTO needs the author (the
 // user relation) and the lesson title.
@@ -486,4 +494,213 @@ export async function setPostStatus(
   });
 
   return { post: toPostDto(updated) };
+}
+
+// ---------------------------------------------------------------------------
+// Owner Q&A console
+//
+// The owner reads and answers every course's questions. These reads skip the
+// learner access rule (no enrolment) and the "hidden reads as absent" rule —
+// moderation state is VISIBLE here, labelled. Replies go through the same
+// transaction shape as learner replies (post + counters + outbox + audit), so
+// the thread author's notification fans out unchanged.
+// ---------------------------------------------------------------------------
+
+/** Owner reads additionally need the denormalized course identity. */
+const OWNER_THREAD_SELECT = {
+  ...THREAD_SUMMARY_SELECT,
+  courseId: true,
+  course: { select: { title: true } },
+} satisfies Prisma.DiscussionThreadSelect;
+
+interface OwnerThreadRowLike extends ThreadRowLike {
+  courseId: string;
+  course: { title: string };
+}
+
+function toOwnerThreadSummaryDto(row: OwnerThreadRowLike): OwnerThreadSummaryDto {
+  return {
+    ...toThreadSummaryDto(row),
+    courseId: row.courseId,
+    courseTitle: row.course.title,
+  };
+}
+
+/**
+ * Every course's question threads, newest activity first, optionally filtered
+ * by moderation status (ALL includes hidden threads). Same keyset pagination
+ * as the learner list. Query budget: 2 (page + total).
+ */
+export async function listOwnerThreads(input: unknown): Promise<PaginatedOwnerThreadsDto> {
+  const query = ownerThreadListQuerySchema.parse(input);
+
+  const where: Prisma.DiscussionThreadWhereInput =
+    query.status === "ALL"
+      ? {}
+      : { status: query.status === "ACTIVE" ? DiscussionStatus.ACTIVE : DiscussionStatus.HIDDEN };
+  if (query.cursor) {
+    const cursor = decodeActivityCursor(query.cursor);
+    const cursorDate = new Date(cursor.lastActivityAt);
+    where.AND = [
+      {
+        OR: [
+          { lastActivityAt: { lt: cursorDate } },
+          { lastActivityAt: cursorDate, id: { lt: cursor.id } },
+        ],
+      },
+    ];
+  }
+
+  const [rows, total] = await Promise.all([
+    db.discussionThread.findMany({
+      where,
+      select: OWNER_THREAD_SELECT,
+      orderBy: [{ lastActivityAt: "desc" }, { id: "desc" }],
+      take: query.limit + 1,
+    }),
+    db.discussionThread.count({ where }),
+  ]);
+
+  const hasMore = rows.length > query.limit;
+  const items = hasMore ? rows.slice(0, query.limit) : rows;
+  const lastItem = items.at(-1);
+
+  return {
+    items: items.map(toOwnerThreadSummaryDto),
+    nextCursor:
+      hasMore && lastItem
+        ? encodeActivityCursor({
+            lastActivityAt: lastItem.lastActivityAt.toISOString(),
+            id: lastItem.id,
+          })
+        : null,
+    total,
+  };
+}
+
+/**
+ * One thread with its (ascending) reply page for the owner. Unlike the
+ * learner read, hidden threads resolve normally and posts are NOT filtered
+ * by status — the owner sees the full conversation with HIDDEN labels.
+ * Query budget: 1 (thread) + 2 (post page + total).
+ */
+export async function getOwnerThread(threadId: string, input: unknown): Promise<OwnerThreadDetailDto> {
+  const query = replyListQuerySchema.parse(input);
+
+  const thread = await db.discussionThread.findUnique({
+    where: { id: threadId },
+    select: OWNER_THREAD_SELECT,
+  });
+  if (!thread) throw THREAD_ABSENT_ERROR();
+
+  const where: Prisma.DiscussionPostWhereInput = { threadId: thread.id };
+  if (query.cursor) {
+    const cursor = decodeCursor(query.cursor);
+    const cursorDate = new Date(cursor.createdAt);
+    where.AND = [
+      {
+        OR: [
+          { createdAt: { gt: cursorDate } },
+          { createdAt: cursorDate, id: { gt: cursor.id } },
+        ],
+      },
+    ];
+  }
+
+  const [rows, totalPosts] = await Promise.all([
+    db.discussionPost.findMany({
+      where,
+      select: POST_SELECT,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: query.limit + 1,
+    }),
+    db.discussionPost.count({ where }),
+  ]);
+
+  const hasMore = rows.length > query.limit;
+  const items = hasMore ? rows.slice(0, query.limit) : rows;
+  const lastItem = items.at(-1);
+
+  return {
+    thread: toOwnerThreadSummaryDto(thread),
+    posts: items.map(toPostDto),
+    nextCursor:
+      hasMore && lastItem
+        ? encodeCursor({ createdAt: lastItem.createdAt.toISOString(), id: lastItem.id })
+        : null,
+    totalPosts,
+  };
+}
+
+/**
+ * Owner reply: same transaction shape as the learner reply (post create,
+ * denormalized counters, outbox event, audit) so the thread author's
+ * notification fans out unchanged. Enrolment is NOT required and replies to
+ * threads on draft lessons are allowed, but a hidden thread must be restored
+ * before it accepts answers (it reads as absent to learners, so a reply
+ * would be invisible work).
+ */
+export async function replyAsOwner(
+  ownerId: string,
+  threadId: string,
+  input: { body: string },
+  requestId: string,
+): Promise<{ post: DiscussionPostDto }> {
+  const thread = await db.discussionThread.findUnique({
+    where: { id: threadId },
+    select: { id: true, status: true, courseId: true, lessonId: true },
+  });
+  if (!thread) throw THREAD_ABSENT_ERROR();
+  if (thread.status === DiscussionStatus.HIDDEN) {
+    throw new ApiError(
+      422,
+      THREAD_NOT_ACTIVE,
+      "Restore this thread before replying — it is currently hidden from students.",
+    );
+  }
+
+  const post = await withTransaction(async (tx) => {
+    const created = await tx.discussionPost.create({
+      data: { threadId: thread.id, userId: ownerId, body: input.body },
+      select: POST_SELECT,
+    });
+
+    await tx.discussionThread.update({
+      where: { id: thread.id },
+      data: { postCount: { increment: 1 }, lastActivityAt: new Date() },
+      select: { id: true },
+    });
+
+    await tx.outboxEvent.create({
+      data: {
+        eventKey: `discussion.post:${created.id}`,
+        topic: "discussion.thread_replied",
+        aggregateType: "DiscussionPost",
+        aggregateId: created.id,
+        payload: {
+          threadId: thread.id,
+          courseId: thread.courseId,
+          lessonId: thread.lessonId,
+          authorUserId: ownerId,
+        },
+      },
+      select: { id: true },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: ownerId,
+        action: "discussion.replied",
+        entityType: "DiscussionPost",
+        entityId: created.id,
+        requestId,
+        metadata: { threadId: thread.id, courseId: thread.courseId, lessonId: thread.lessonId },
+      },
+      select: { id: true },
+    });
+
+    return created;
+  });
+
+  return { post: toPostDto(post) };
 }

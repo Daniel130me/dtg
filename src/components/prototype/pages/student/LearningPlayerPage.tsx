@@ -257,22 +257,25 @@ export default function LearningPlayerPage() {
   // panels report satisfaction here so "Mark as complete" can explain itself.
   // Defaults to satisfied (VIDEO/TEXT lessons and pre-fetch states are ungated);
   // the server remains the authoritative gate either way.
-  const [assessmentGate, setAssessmentGate] = useState<{ satisfied: boolean; message: string | null }>({
-    satisfied: true,
-    message: null,
-  });
-
-  // Panels are remounted per lesson; reset the gate until the new lesson's
-  // panel reports (VIDEO/TEXT lessons simply never report, staying ungated).
-  useEffect(() => {
-    setAssessmentGate({ satisfied: true, message: null });
-  }, [lessonId]);
+  const [reportedAssessmentGate, setReportedAssessmentGate] = useState<{
+    lessonId: string;
+    satisfied: boolean;
+    message: string | null;
+  } | null>(null);
+  // A report only applies to the lesson that produced it. This derives the
+  // default for a newly selected lesson without a synchronous effect update.
+  const assessmentGate =
+    reportedAssessmentGate?.lessonId === lessonId
+      ? reportedAssessmentGate
+      : { satisfied: true, message: null };
 
   const handleGateChange = useCallback((satisfied: boolean, message: string | null) => {
-    setAssessmentGate((prev) =>
-      prev.satisfied === satisfied && prev.message === message ? prev : { satisfied, message },
+    setReportedAssessmentGate((prev) =>
+      prev?.lessonId === lessonId && prev.satisfied === satisfied && prev.message === message
+        ? prev
+        : { lessonId, satisfied, message },
     );
-  }, []);
+  }, [lessonId]);
 
   useEffect(() => {
     let cancelled = false;

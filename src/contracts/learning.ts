@@ -206,6 +206,57 @@ export const replyCreateSchema = z.object({
 export const moderationUpdateSchema = z.object({ status: z.enum(DISCUSSION_STATUSES) });
 
 // ---------------------------------------------------------------------------
+// Owner Q&A console (owner discussions)
+// ---------------------------------------------------------------------------
+
+/** Client-matchable error code: replying to a moderated (hidden) thread. */
+export const THREAD_NOT_ACTIVE = "THREAD_NOT_ACTIVE";
+
+/** Bounded read: page size for the owner console's thread list. */
+export const OWNER_THREAD_PAGE_LIMIT_DEFAULT = 15;
+export const OWNER_THREAD_PAGE_LIMIT_MAX = 30;
+
+/** Owner list filter — ALL includes moderated (hidden) threads. */
+export const OWNER_THREAD_STATUS_FILTERS = ["ALL", "ACTIVE", "HIDDEN"] as const;
+export type OwnerThreadStatusFilter = (typeof OWNER_THREAD_STATUS_FILTERS)[number];
+
+export const ownerThreadListQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(OWNER_THREAD_PAGE_LIMIT_MAX)
+    .default(OWNER_THREAD_PAGE_LIMIT_DEFAULT),
+  status: z.enum(OWNER_THREAD_STATUS_FILTERS).default("ALL"),
+});
+
+/**
+ * Owner-facing thread summary: the learner shape plus the denormalized
+ * course identity, so one console row can show "Course → Lesson" without a
+ * second lookup.
+ */
+export const ownerThreadSummarySchema = discussionThreadSummarySchema.extend({
+  courseId: z.uuid(),
+  courseTitle: z.string(),
+});
+
+export const paginatedOwnerThreadsSchema = z.object({
+  items: z.array(ownerThreadSummarySchema),
+  nextCursor: z.string().nullable(),
+  total: z.number().int().nonnegative(),
+});
+
+/** Owner thread detail: posts are NOT filtered by status (hidden posts carry
+ * their HIDDEN label) so the owner sees the full conversation. */
+export const ownerThreadDetailSchema = z.object({
+  thread: ownerThreadSummarySchema,
+  posts: z.array(discussionPostSchema),
+  nextCursor: z.string().nullable(),
+  totalPosts: z.number().int().nonnegative(),
+});
+
+// ---------------------------------------------------------------------------
 // Path parameter schemas (mirror courseSlugParamSchema in contracts/catalog)
 // ---------------------------------------------------------------------------
 
@@ -223,4 +274,7 @@ export type DiscussionThreadSummaryDto = z.infer<typeof discussionThreadSummaryS
 export type PaginatedThreadsDto = z.infer<typeof paginatedThreadsSchema>;
 export type DiscussionPostDto = z.infer<typeof discussionPostSchema>;
 export type ThreadDetailDto = z.infer<typeof threadDetailSchema>;
+export type OwnerThreadSummaryDto = z.infer<typeof ownerThreadSummarySchema>;
+export type PaginatedOwnerThreadsDto = z.infer<typeof paginatedOwnerThreadsSchema>;
+export type OwnerThreadDetailDto = z.infer<typeof ownerThreadDetailSchema>;
 export type ProgressResultDto = z.infer<typeof progressResultSchema>;

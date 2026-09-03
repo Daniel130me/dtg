@@ -13,6 +13,8 @@ import {
   ExternalLink,
   ClipboardCheck,
   MessageSquareQuote,
+  MessagesSquare,
+  Settings,
   Award,
   LogOut,
   Menu,
@@ -31,6 +33,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', view: 'instructor-dashboard', icon: <LayoutDashboard className="size-5" /> },
   { label: 'Course Management', view: 'course-management', icon: <BookOpen className="size-5" /> },
+  { label: 'Q&A', view: 'owner-qa', icon: <MessagesSquare className="size-5" /> },
   { label: 'Grading', view: 'grading', icon: <ClipboardCheck className="size-5" /> },
   { label: 'Certificates', view: 'certificates-admin', icon: <Award className="size-5" /> },
   { label: 'Reviews', view: 'reviews', icon: <MessageSquareQuote className="size-5" /> },
@@ -109,6 +112,13 @@ function SidebarContent({ effectiveView, onClose }: SidebarContentProps) {
         })}
 
         <div className="pt-3 mt-3 border-t border-white/10">
+          <button
+            onClick={() => handleNav('owner-settings')}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all active:bg-white/15"
+          >
+            <Settings className="size-5" />
+            Account Settings
+          </button>
           <button
             onClick={() => handleNav('courses')}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-background/70 hover:bg-white/10 hover:text-background transition-all active:bg-white/15"

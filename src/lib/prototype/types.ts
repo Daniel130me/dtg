@@ -13,6 +13,8 @@ export type ViewName =
   | 'notifications'
   | 'profile'
   | 'instructor-dashboard'
+  | 'owner-settings'
+  | 'owner-qa'
   | 'course-management'
   | 'student-management'
   | 'analytics'

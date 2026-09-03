@@ -110,14 +110,18 @@ export async function reconcileOrder(
 // ---------------------------------------------------------------------------
 
 import type {
+  ownerThreadListQuerySchema,
   replyListQuerySchema,
   threadListQuerySchema,
   CourseProgressDto,
   DiscussionPostDto,
+  DiscussionStatusValue,
   DiscussionThreadSummaryDto,
   LearnerDashboardDto,
   LessonAccessDto,
   LessonNoteDto,
+  OwnerThreadDetailDto,
+  PaginatedOwnerThreadsDto,
   PaginatedThreadsDto,
   ProgressResultDto,
   ThreadDetailDto,
@@ -222,5 +226,60 @@ export function replyToThread(threadId: string, body: string): Promise<Discussio
   return apiRequest<{ post: DiscussionPostDto }>(
     `${LEARNING_BASE_PATH}/learning/threads/${encodeURIComponent(threadId)}/replies`,
     { method: "POST", body: JSON.stringify({ body }) },
+  ).then((payload) => payload.post);
+}
+
+// ---------------------------------------------------------------------------
+// Owner Q&A console — every course's threads, moderation, and owner replies.
+// ---------------------------------------------------------------------------
+
+type OwnerThreadListQueryInput = z.input<typeof ownerThreadListQuerySchema>;
+
+/** GET /api/v1/owner/discussions/threads — all threads, status-filterable. */
+export function listOwnerThreads(
+  query: OwnerThreadListQueryInput = {},
+): Promise<PaginatedOwnerThreadsDto> {
+  return apiRequest<PaginatedOwnerThreadsDto>(
+    `${LEARNING_BASE_PATH}/owner/discussions/threads${buildQuerySuffix(query)}`,
+  );
+}
+
+/** GET one thread with ALL of its posts (hidden ones labelled). */
+export function fetchOwnerThread(
+  threadId: string,
+  query: ReplyListQueryInput = {},
+): Promise<OwnerThreadDetailDto> {
+  return apiRequest<OwnerThreadDetailDto>(
+    `${LEARNING_BASE_PATH}/owner/discussions/threads/${encodeURIComponent(threadId)}${buildQuerySuffix(query)}`,
+  );
+}
+
+/** POST an owner reply. Same notification fan-out as a learner reply. */
+export function replyToThreadAsOwner(threadId: string, body: string): Promise<DiscussionPostDto> {
+  return apiRequest<{ post: DiscussionPostDto }>(
+    `${LEARNING_BASE_PATH}/owner/discussions/threads/${encodeURIComponent(threadId)}/replies`,
+    { method: "POST", body: JSON.stringify({ body }) },
+  ).then((payload) => payload.post);
+}
+
+/** PATCH a thread's moderation status (hide/restore). Unwraps `{ thread }`. */
+export function moderateOwnerThread(
+  threadId: string,
+  status: DiscussionStatusValue,
+): Promise<DiscussionThreadSummaryDto> {
+  return apiRequest<{ thread: DiscussionThreadSummaryDto }>(
+    `${LEARNING_BASE_PATH}/owner/discussions/threads/${encodeURIComponent(threadId)}`,
+    { method: "PATCH", body: JSON.stringify({ status }) },
+  ).then((payload) => payload.thread);
+}
+
+/** PATCH a single post's moderation status. Unwraps `{ post }`. */
+export function moderateOwnerPost(
+  postId: string,
+  status: DiscussionStatusValue,
+): Promise<DiscussionPostDto> {
+  return apiRequest<{ post: DiscussionPostDto }>(
+    `${LEARNING_BASE_PATH}/owner/discussions/posts/${encodeURIComponent(postId)}`,
+    { method: "PATCH", body: JSON.stringify({ status }) },
   ).then((payload) => payload.post);
 }

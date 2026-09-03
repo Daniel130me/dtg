@@ -1,6 +1,7 @@
 import type { ApiFailure } from "@/contracts/api";
 import type {
   AccountProfileDto,
+  ChangeEmailInput,
   ChangePasswordInput,
   DeleteAccountInput,
   UpdateAccountProfileInput,
@@ -37,6 +38,19 @@ export function changeAccountPassword(
   input: ChangePasswordInput,
 ): Promise<{ sessionsRevoked: number }> {
   return apiRequest<{ sessionsRevoked: number }>(`${ACCOUNT_API_BASE}/password`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * POST /api/v1/account/email — change the email behind a current-password
+ * check. The existing address stays active until the new one is verified.
+ */
+export function changeAccountEmail(
+  input: ChangeEmailInput,
+): Promise<{ verificationRequested: true }> {
+  return apiRequest<{ verificationRequested: true }>(`${ACCOUNT_API_BASE}/email`, {
     method: "POST",
     body: JSON.stringify(input),
   });

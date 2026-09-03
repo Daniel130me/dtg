@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   learnerDashboardSchema,
+  moderationUpdateSchema,
+  ownerThreadListQuerySchema,
+  OWNER_THREAD_PAGE_LIMIT_DEFAULT,
+  OWNER_THREAD_PAGE_LIMIT_MAX,
   progressResultSchema,
   progressUpdateSchema,
+  replyCreateSchema,
   threadDetailSchema,
 } from "@/contracts/learning";
 import {
@@ -217,6 +222,36 @@ describe("lesson completion gate (Coursera-style assessment enforcement)", () =>
       assignmentSubmitted: null,
     });
     assert.equal(unauthoredAssignment.allowed, true);
+  });
+});
+
+describe("owner Q&A contracts", () => {
+  it("applies bounded defaults and accepts each moderation filter", () => {
+    assert.deepEqual(ownerThreadListQuerySchema.parse({}), {
+      limit: OWNER_THREAD_PAGE_LIMIT_DEFAULT,
+      status: "ALL",
+    });
+    assert.equal(ownerThreadListQuerySchema.parse({ status: "ACTIVE" }).status, "ACTIVE");
+    assert.equal(ownerThreadListQuerySchema.parse({ status: "HIDDEN" }).status, "HIDDEN");
+  });
+
+  it("rejects oversized pages and unsupported status values", () => {
+    assert.throws(() =>
+      ownerThreadListQuerySchema.parse({ limit: OWNER_THREAD_PAGE_LIMIT_MAX + 1 }),
+    );
+    assert.throws(() => ownerThreadListQuerySchema.parse({ status: "DELETED" }));
+  });
+
+  it("trims replies, rejects empty messages, and allowlists moderation state", () => {
+    assert.deepEqual(replyCreateSchema.parse({ body: "  I can help with that.  " }), {
+      body: "I can help with that.",
+    });
+    assert.throws(() => replyCreateSchema.parse({ body: "   " }));
+    assert.deepEqual(moderationUpdateSchema.parse({ status: "HIDDEN" }), { status: "HIDDEN" });
+    assert.throws(() => moderationUpdateSchema.parse({ status: "DELETED" }));
+    assert.deepEqual(moderationUpdateSchema.parse({ status: "ACTIVE", role: "OWNER" }), {
+      status: "ACTIVE",
+    });
   });
 });
 

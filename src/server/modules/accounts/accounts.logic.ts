@@ -3,6 +3,7 @@ import {
   ACCOUNT_NOT_ACTIVE,
   DELETION_CONFIRMATION_MISMATCH,
   DELETION_CONFIRMATION_WORD,
+  EMAIL_UNCHANGED,
   NOTIFICATION_PREFS_DEFAULTS,
   NOTIFICATION_PREF_KEYS,
   OWNER_DELETE_FORBIDDEN,
@@ -31,6 +32,7 @@ export const ACCOUNT_PASSWORD_MAX_LENGTH = PASSWORD_MAX_LENGTH;
 export const ACCOUNT_AUDIT = {
   profileUpdated: "account.profile.updated",
   passwordChanged: "account.password.changed",
+  emailChangeRequested: "account.email.change_requested",
   deleted: "account.deleted",
 } as const;
 
@@ -124,6 +126,28 @@ export function evaluatePasswordChange(
   if (newPassword.length > ACCOUNT_PASSWORD_MAX_LENGTH) return { ok: false, code: "PASSWORD_TOO_LONG" };
   if (newPassword === currentPassword) return { ok: false, code: "PASSWORD_UNCHANGED" };
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Email change policy
+// ---------------------------------------------------------------------------
+
+export type EmailChangeDecision =
+  | { ok: true; normalizedEmail: string }
+  | { ok: false; code: typeof EMAIL_UNCHANGED };
+
+/**
+ * Pure policy for a NEW email. The caller's schema already trims/lowercases,
+ * but the normalization is repeated here so the rule holds for any future
+ * caller; comparison happens on the normalized pair so "same address,
+ * different case" can never slip through as a change.
+ */
+export function evaluateEmailChange(newEmail: string, currentEmail: string): EmailChangeDecision {
+  const normalizedEmail = newEmail.trim().toLowerCase();
+  if (normalizedEmail === currentEmail.trim().toLowerCase()) {
+    return { ok: false, code: EMAIL_UNCHANGED };
+  }
+  return { ok: true, normalizedEmail };
 }
 
 // ---------------------------------------------------------------------------

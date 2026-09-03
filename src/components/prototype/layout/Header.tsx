@@ -101,7 +101,12 @@ export default function Header() {
                         <LayoutDashboard className='size-4 mr-2' /> Dashboard
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={() => navigate('profile')} className='cursor-pointer'>
+                    {/* Owners get their own console settings page; students
+                        get the learner profile. */}
+                    <DropdownMenuItem
+                      onClick={() => navigate(userRole === 'owner' ? 'owner-settings' : 'profile')}
+                      className='cursor-pointer'
+                    >
                       <User className='size-4 mr-2' /> Profile
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -178,7 +183,10 @@ export default function Header() {
                           Dashboard
                         </button>
                       )}
-                      <button onClick={() => handleNav('profile')} className='px-3 py-3 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-accent transition-colors'>
+                      <button
+                        onClick={() => handleNav(userRole === 'owner' ? 'owner-settings' : 'profile')}
+                        className='px-3 py-3 rounded-lg text-sm font-medium text-left text-muted-foreground hover:bg-accent transition-colors'
+                      >
                         Profile
                       </button>
                       <button onClick={() => { logout(); setMobileOpen(false); }} className='px-3 py-3 rounded-lg text-sm font-medium text-left text-red-600 hover:bg-red-50 transition-colors'>

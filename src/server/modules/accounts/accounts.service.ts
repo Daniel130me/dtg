@@ -1,14 +1,21 @@
 import {
   ACCOUNT_NOT_ACTIVE,
+  EMAIL_IN_USE,
+  EMAIL_UNCHANGED,
   INVALID_CREDENTIALS,
   LOCALES,
   OWNER_DELETE_FORBIDDEN,
+  OWNER_EMAIL_RESERVED,
   LOCALE_DEFAULT,
   type AccountProfileDto,
+  type ChangeEmailInput,
   type ChangePasswordInput,
   type LocaleValue,
   type UpdateAccountProfileInput,
 } from "@/contracts/accounts";
+import { getServerEnv } from "@/server/config/env";
+import { auth } from "@/server/auth/auth";
+import { isReservedOwnerEmail } from "@/server/auth/registration-policy";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { db } from "@/server/db/client";
 import { ApiError } from "@/server/http/errors";
@@ -18,6 +25,7 @@ import {
   anonymizeIdentity,
   buildAccountExportDocument,
   evaluateAccountDeletion,
+  evaluateEmailChange,
   evaluatePasswordChange,
   hashedEmailIdentifier,
   mergeNotificationPrefs,
@@ -254,6 +262,93 @@ export async function changePassword(
   });
 
   return { sessionsRevoked };
+}
+
+/**
+ * Starts a verified email-change flow behind a current-password check. The
+ * existing address remains active until the owner clicks the link delivered
+ * to the new address, so a typo or mail outage cannot lock the owner out.
+ *
+ * Guards, in order: unchanged address, the reserved owner email (students
+ * may not claim it; the owner may move back onto it), credential proof, and
+ * the emailNormalized UNIQUE constraint. Better Auth owns the signed,
+ * expiring verification token and performs the eventual identity update.
+ */
+export async function changeEmail(
+  userId: string,
+  input: ChangeEmailInput,
+  requestId: string,
+  requestHeaders: Headers,
+): Promise<{ verificationRequested: true }> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      accounts: {
+        where: { providerId: "credential", issuer: "local:credential" },
+        take: 1,
+        select: { password: true },
+      },
+    },
+  });
+  if (!user) throw new ApiError(404, "NOT_FOUND", "The account was not found.");
+
+  const decision = evaluateEmailChange(input.newEmail, user.email);
+  if (!decision.ok) {
+    throw new ApiError(
+      422,
+      decision.code,
+      "The new email must be different from the current email.",
+    );
+  }
+  const newEmail = decision.normalizedEmail;
+
+  if (user.role !== "OWNER" && isReservedOwnerEmail(newEmail, getServerEnv().OWNER_EMAIL)) {
+    throw new ApiError(
+      422,
+      OWNER_EMAIL_RESERVED,
+      "This email is reserved and cannot be used.",
+    );
+  }
+
+  const credential = user.accounts[0];
+  const verified =
+    credential?.password !== null &&
+    credential?.password !== undefined &&
+    (await verifyPassword({ hash: credential.password, password: input.currentPassword }));
+  if (!credential || !verified) {
+    throw new ApiError(400, INVALID_CREDENTIALS, "Current password is incorrect.");
+  }
+
+  const clash = await db.user.findUnique({
+    where: { emailNormalized: newEmail },
+    select: { id: true },
+  });
+  if (clash && clash.id !== userId) {
+    throw new ApiError(422, EMAIL_IN_USE, "That email is already in use by another account.");
+  }
+
+  await auth.api.changeEmail({
+    headers: requestHeaders,
+    body: { newEmail, callbackURL: "/owner/settings" },
+  });
+
+  await db.auditLog.create({
+    data: {
+      actorUserId: userId,
+      action: ACCOUNT_AUDIT.emailChangeRequested,
+      entityType: "User",
+      entityId: userId,
+      requestId,
+      // The address itself is personal data — the audit records the event only.
+      metadata: {},
+    },
+    select: { id: true },
+  });
+
+  return { verificationRequested: true };
 }
 
 /**

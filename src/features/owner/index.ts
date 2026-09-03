@@ -1,4 +1,6 @@
 export { default as OwnerDashboardPage } from "@/components/prototype/pages/instructor/InstructorDashboard";
+export { default as OwnerSettingsPage } from "@/components/prototype/pages/instructor/OwnerSettingsPage";
+export { default as OwnerQAPage } from "@/components/prototype/pages/instructor/OwnerQAPage";
 export { default as CourseManagementPage } from "@/components/prototype/pages/instructor/CourseManagement";
 export { default as StudentManagementPage } from "@/components/prototype/pages/instructor/StudentManagement";
 export { default as OwnerAnalyticsPage } from "@/components/prototype/pages/instructor/AnalyticsPage";

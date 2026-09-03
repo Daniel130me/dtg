@@ -58,6 +58,9 @@ export function createAuthService(
       },
     },
     user: {
+      changeEmail: {
+        enabled: true,
+      },
       additionalFields: {
         emailNormalized: { type: "string", required: false, input: false },
         role: { type: "string", required: true, defaultValue: "STUDENT", input: false },
@@ -210,6 +213,19 @@ export function createAuthService(
               },
               select: { id: true },
             });
+          },
+        },
+        update: {
+          before: async (user) => {
+            if (typeof user.email !== "string") return { data: user };
+            const emailNormalized = normalizeRegistrationEmail(user.email);
+            return {
+              data: {
+                ...user,
+                email: emailNormalized,
+                emailNormalized,
+              },
+            };
           },
         },
       },

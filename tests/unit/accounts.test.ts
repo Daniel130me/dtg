@@ -5,6 +5,7 @@ import {
   accountExportFilename,
   accountProfileSchema,
   BIO_MAX,
+  changeEmailSchema,
   changePasswordSchema,
   DELETION_CONFIRMATION_WORD,
   NAME_MAX,
@@ -21,6 +22,7 @@ import {
   buildAccountExportDocument,
   evaluateAccountDeletion,
   evaluateDeletionConfirmation,
+  evaluateEmailChange,
   evaluatePasswordChange,
   hashedEmailIdentifier,
   mergeNotificationPrefs,
@@ -168,6 +170,38 @@ describe("password policy", () => {
       newPassword: "a".repeat(ACCOUNT_PASSWORD_MIN_LENGTH),
     });
     assert.equal(parsed.currentPassword, "current-password-123");
+  });
+});
+
+describe("email change policy", () => {
+  it("normalizes a genuinely new address", () => {
+    assert.deepEqual(evaluateEmailChange(" New.Owner@Example.COM ", "owner@example.com"), {
+      ok: true,
+      normalizedEmail: "new.owner@example.com",
+    });
+  });
+
+  it("rejects the current address regardless of casing or whitespace", () => {
+    assert.deepEqual(evaluateEmailChange(" OWNER@example.com ", "owner@example.com"), {
+      ok: false,
+      code: "EMAIL_UNCHANGED",
+    });
+  });
+
+  it("validates and normalizes the email-change request body", () => {
+    const parsed = changeEmailSchema.parse({
+      currentPassword: "current-password-123",
+      newEmail: " New.Owner@Example.COM ",
+    });
+    assert.equal(parsed.newEmail, "new.owner@example.com");
+    assert.throws(() => changeEmailSchema.parse({ currentPassword: "", newEmail: "invalid" }));
+    assert.throws(() =>
+      changeEmailSchema.parse({
+        currentPassword: "current-password-123",
+        newEmail: "owner@example.com",
+        role: "OWNER",
+      }),
+    );
   });
 });
 
@@ -425,6 +459,7 @@ describe("account export builder", () => {
     assert.deepEqual(ACCOUNT_AUDIT, {
       profileUpdated: "account.profile.updated",
       passwordChanged: "account.password.changed",
+      emailChangeRequested: "account.email.change_requested",
       deleted: "account.deleted",
     });
   });

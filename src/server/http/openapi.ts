@@ -424,7 +424,38 @@ export const openApiDocument = {
         },
       },
     },
+    "/owner/discussions/threads": {
+      get: {
+        operationId: "listOwnerThreads",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 30 } },
+          { name: "status", in: "query", required: false, schema: { type: "string", enum: ["ALL", "ACTIVE", "HIDDEN"] } },
+        ],
+        responses: {
+          "200": { description: "Every course's question threads, newest activity first (ALL includes hidden)." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+        },
+      },
+    },
     "/owner/discussions/threads/{threadId}": {
+      get: {
+        operationId: "getOwnerThread",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "threadId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          "200": { description: "The full conversation — hidden threads and posts included, labelled." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Thread not found." },
+        },
+      },
       patch: {
         operationId: "moderateDiscussionThread",
         security: [{ sessionCookie: [] }],
@@ -437,6 +468,22 @@ export const openApiDocument = {
           "403": { description: "Owner access is required." },
           "404": { description: "Thread not found." },
           "422": { description: "Body validation failed." },
+        },
+      },
+    },
+    "/owner/discussions/threads/{threadId}/replies": {
+      post: {
+        operationId: "replyToThreadAsOwner",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: "threadId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "201": { description: "Owner reply posted; the thread author is notified." },
+          "401": { description: "Authentication is required." },
+          "403": { description: "Owner access is required." },
+          "404": { description: "Thread not found." },
+          "422": { description: "Thread is hidden (restore first) or body validation failed." },
         },
       },
     },
@@ -1466,6 +1513,19 @@ export const openApiDocument = {
           "400": { description: "Current password is incorrect." },
           "401": { description: "Authentication is required." },
           "422": { description: "Body validation failed or the new password equals the current one." },
+          "429": { description: "Rate limit exceeded." },
+        },
+      },
+    },
+    "/account/email": {
+      post: {
+        operationId: "changeAccountEmail",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          "200": { description: "Email change requested; the current address remains active until the new address is verified." },
+          "400": { description: "Current password is incorrect." },
+          "401": { description: "Authentication is required." },
+          "422": { description: "Unchanged, reserved, or in-use email, or body validation failed." },
           "429": { description: "Rate limit exceeded." },
         },
       },

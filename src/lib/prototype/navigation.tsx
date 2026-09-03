@@ -47,6 +47,8 @@ const VIEW_ROUTES: Record<ViewName, string> = {
   notifications: '/notifications',
   profile: '/profile',
   'instructor-dashboard': '/owner',
+  'owner-settings': '/owner/settings',
+  'owner-qa': '/owner/discussions',
   'course-management': '/owner/courses',
   'student-management': '/owner/students',
   analytics: '/owner/analytics',
@@ -71,6 +73,8 @@ function resolveView(pathname: string): ViewName {
   if (pathname === '/notifications') return 'notifications';
   if (pathname === '/profile') return 'profile';
   if (pathname === '/owner') return 'instructor-dashboard';
+  if (pathname === '/owner/settings') return 'owner-settings';
+  if (pathname === '/owner/discussions') return 'owner-qa';
   if (pathname === '/owner/courses/new') return 'create-course';
   if (pathname === '/owner/courses' || pathname.startsWith('/owner/courses/')) return 'course-management';
   if (pathname === '/owner/students') return 'student-management';

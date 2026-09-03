@@ -39,6 +39,9 @@ export const OWNER_DELETE_FORBIDDEN = "OWNER_DELETE_FORBIDDEN";
 export const ACCOUNT_NOT_ACTIVE = "ACCOUNT_NOT_ACTIVE";
 export const INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
 export const DELETION_CONFIRMATION_MISMATCH = "DELETION_CONFIRMATION_MISMATCH";
+export const EMAIL_UNCHANGED = "EMAIL_UNCHANGED";
+export const EMAIL_IN_USE = "EMAIL_IN_USE";
+export const OWNER_EMAIL_RESERVED = "OWNER_EMAIL_RESERVED";
 
 // ---------------------------------------------------------------------------
 // Notification preferences
@@ -150,6 +153,24 @@ export const changePasswordSchema = z.strictObject({
 });
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/**
+ * POST /account/email body. The new address is trimmed + lowercased in the
+ * schema so the wire value already matches the User.emailNormalized storage
+ * convention (normalizeRegistrationEmail in server/auth/registration-policy).
+ * Ownership is proven by currentPassword — the same rule as password change.
+ */
+export const changeEmailSchema = z.strictObject({
+  currentPassword: z.string().min(1, "Current password is required."),
+  newEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(320, "Email must be at most 320 characters.")
+    .pipe(z.email("Enter a valid email address.")),
+});
+
+export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
 
 export const deleteAccountSchema = z.strictObject({
   confirmation: z.string(),
