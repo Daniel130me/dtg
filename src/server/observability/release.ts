@@ -11,8 +11,8 @@ import packageJson from "../../../package.json";
 //
 // RELEASE_ID is declared in config/env.ts as the operator-facing knob; here it
 // is read once from the process environment and cached, falling back to the
-// package.json version so every deployment has a stable release identifier
-// even when the variable is not set.
+// Render's immutable commit SHA and then package.json, so every deployment has
+// a stable release identifier without requiring another copied secret.
 // ---------------------------------------------------------------------------
 
 export interface ReleaseInfo {
@@ -31,7 +31,8 @@ let cachedReleaseId: string | undefined;
 
 function resolveReleaseId(env: EnvSource): string {
   const explicit = env.RELEASE_ID?.trim();
-  return explicit ? explicit : packageJson.version;
+  const renderCommit = env.RENDER_GIT_COMMIT?.trim();
+  return explicit || renderCommit || packageJson.version;
 }
 
 /**

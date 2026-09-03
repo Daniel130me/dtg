@@ -16,6 +16,11 @@ describe("release info", () => {
     assert.equal(info.environment, "production");
   });
 
+  it("uses Render's commit SHA when an explicit release id is unset", () => {
+    const info = getReleaseInfo({ env: { RENDER_GIT_COMMIT: "  abc123def  ", NODE_ENV: "production" } });
+    assert.equal(info.releaseId, "abc123def");
+  });
+
   it("defaults the environment to development when NODE_ENV is absent", () => {
     assert.equal(getReleaseInfo({ env: {} }).environment, "development");
   });

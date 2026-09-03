@@ -55,8 +55,8 @@ apply and verify:
 
 ### 4.1 Point-in-time restore (primary path)
 
-1. Freeze writes: stop cron-style jobs (outbox dispatch is in-process and
-   stops with the app; there is no external scheduler to pause).
+1. Freeze writes: suspend the Render `dtg-outbox-dispatch` cron job, then put
+   the web service into maintenance or otherwise stop application writes.
 2. Neon console → production branch → **Restore** → choose the timestamp
    (inside the PITR window). Neon creates a NEW branch at that point in time.
 3. Note the restore branch connection strings (direct + pooled).
@@ -64,7 +64,7 @@ apply and verify:
    branch. Redeploy/restart the application so both are re-read.
 5. Verify: `bunx prisma migrate status` must report "Database schema is up to
    date" with no pending migrations and no drift.
-6. Run the smoke checks: `bunx tsx scripts/smoke.ts "$APP_URL"` (health,
+6. Run the smoke checks: `npm run smoke -- "$APP_URL"` (health,
    catalog, auth guards, OpenAPI). Section 5 adds the data-level checks.
 7. After the soak period, name the restore branch as the new production
    branch (or update DNS/secrets to point at it permanently) and re-enable

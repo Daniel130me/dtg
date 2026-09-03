@@ -21,7 +21,7 @@ drift. If a threshold changes in code, change the citation in the same commit.
 | Payments | Flutterwave (secret key + webhook hash) | Optional at boot; both halves required together (see §3) |
 | Email | SMTP via Nodemailer | Optional at boot; dev falls back to structured log delivery |
 | Object storage | Cloudflare R2 | Direct thumbnail uploads and private multipart lecture-video uploads; assignment attachments remain a documented seam (`docs/RECOVERY_RUNBOOK.md` §3) |
-| Runtime shape | Single Next.js server process (`node .next/standalone/server.js`) | No sidecars; the outbox dispatcher runs on-demand via an owner-triggered endpoint (§6) |
+| Runtime shape | Render Next.js web service (`npm start`) plus scheduled outbox worker | Blueprint and release steps are defined in `docs/RENDER_DEPLOYMENT.md` |
 
 **Request path:** browser → Next.js route handler (`executeRoute` wrapper:
 request id, structured log line, metrics sample, rate limiting, Zod validation)
@@ -50,6 +50,9 @@ requests (`assertAllowedOrigin`, covered by `tests/unit/security.test.ts`).
 
 ### 2.2 Deploy sequence
 
+Render executes the production sequence declared in `render.yaml`. See
+`docs/RENDER_DEPLOYMENT.md` for the environment matrix and first-deploy guide.
+
 ```bash
 # 1. Pre-flight (fails the deploy on drift/pending migrations)
 bunx prisma migrate status
@@ -59,9 +62,9 @@ bunx prisma migrate diff --from-url "$DATABASE_URL" \
 # 2. Apply schema
 bunx prisma migrate deploy
 
-# 3. Build and start (standalone output)
+# 3. Build and start
 npm run build
-node --env-file-if-exists=.env .next/standalone/server.js
+npm start
 ```
 
 ### 2.3 First-deploy provisioning (one-time)
@@ -71,7 +74,7 @@ ALLOW_OWNER_BOOTSTRAP=true \
 OWNER_EMAIL=owner@example.com \
 OWNER_DISPLAY_NAME="Platform Owner" \
 OWNER_PASSWORD='<generated secret>' \
-bunx tsx scripts/bootstrap-owner.ts
+npm run owner:bootstrap
 ```
 
 `ALLOW_OWNER_BOOTSTRAP` defaults to false; provisioning is idempotent and
@@ -82,8 +85,8 @@ from the secret manager after provisioning.**
 ### 2.4 Post-deploy verification (mandatory gate)
 
 ```bash
-bunx tsx scripts/smoke.ts https://<app-url>
-# or: APP_URL=https://<app-url> bunx tsx scripts/smoke.ts
+npm run smoke -- https://<app-url>
+# or: APP_URL=https://<app-url> npm run smoke
 ```
 
 The smoke script is cookie-free, read-only, and idempotent. It checks:
@@ -231,7 +234,7 @@ every business-day shift (§7 duty checklist).
 
 | Cadence | Task | How |
 | --- | --- | --- |
-| Every minute (cron) | Outbox dispatch (notifications + emails + contact-body purge piggyback) | `POST /api/v1/owner/outbox/dispatch` with owner credentials; safe to overlap — events are claimed transactionally and deduplicated |
+| Every minute (cron) | Outbox dispatch (notifications + emails + contact-body purge piggyback) | Render runs `npm run jobs:outbox`; leases and dedupe keys make retries safe |
 | Daily (or per scrape) | Alert check | §4.3 |
 | Weekly | `bunx prisma migrate status` on production (expect: no pending) | CI gate also enforces per deploy |
 | Quarterly | Backup posture re-verify | `docs/RECOVERY_RUNBOOK.md` §2 |
@@ -260,16 +263,14 @@ every business-day shift (§7 duty checklist).
    `src/app/api/v1/**` is registered, with auth requirements and error
    envelopes. `tests/unit/openapi.test.ts` fails the suite if registration
    drifts.
-2. **Demo accounts (local/preview seed):** platform owner
-   `kosokodaniel@gmail.com` / `Phase9!OwnerPass1`; a seeded demo student
-   `student.phase9-e2e@example.test` / `Certified!Passw0rd9` (100% progress,
-   passed quiz, graded assignment, revoked certificate for the demo matrix).
+2. **Demo accounts (local/preview only):** create isolated reviewer accounts
+   with generated passwords. Never seed or document production credentials.
 3. **Quality gates:** `npm run lint && npm run typecheck && npm test`
    (unit + integration suites, 331 tests at Phase 12 close). Tests are
    provider-independent; DB-touching suites need a Postgres
    `DATABASE_URL`/`TEST_DATABASE_URL` (the sqlite URL injected into sandbox
    shells trips env validation by design — that is the validator working).
-4. **Smoke:** `bunx tsx scripts/smoke.ts <base-url>` after any deploy or restore.
+4. **Smoke:** `npm run smoke -- <base-url>` after any deploy or restore.
 5. **Security posture:** `tests/unit/security.test.ts` covers the OWASP API
    slice implemented in-code (CSRF origin gate, BOLA owner guards, mass
    assignment, payload limits, secret hygiene in logs); rate-limit abuse
@@ -294,6 +295,7 @@ documentation.
 | Document | Scope |
 | --- | --- |
 | `docs/BACKEND_SETUP.md` | Local development environment from zero |
+| `docs/RENDER_DEPLOYMENT.md` | Render Blueprint, production secrets, CI/CD, verification, and rollback |
 | `docs/BACKEND_IMPLEMENTATION_PLAN.md` | The 13-phase build plan with acceptance checkboxes |
 | `docs/MIGRATION_RUNBOOK.md` | Deployment checks, expand/contract policy, failure modes |
 | `docs/RECOVERY_RUNBOOK.md` | Neon PITR/restore objectives, R2 policy, restore drill |
@@ -313,6 +315,6 @@ documentation.
 | External alert channel | Worker is an external seam | §4.3 defines the scrape contract; until wired, manual shift checks (§7) |
 | Error monitoring | In-repo (logger + error monitor + `/metrics`) | Sentry/OTel collector attachment is a config-time seam, documented here; no PII leaves the process by default (PII redaction per `docs/PRIVACY.md` §2) |
 | Load/security tests | Offline suites, not CI load runs | Run before launch against a production-like dataset; thresholds in file headers |
-| Single-process outbox dispatcher | On-demand endpoint, no scheduler in-process | External cron (§6) required for notification/email delivery SLA |
+| Outbox dispatcher | Render cron executes a bounded worker every minute | Monitor cron exits and outbox lag; the owner endpoint remains an emergency manual trigger |
 
 Deployment status (2026-09-02): the production Neon project is wired (`DATABASE_URL` pooled / `DIRECT_URL` direct), R2 (bucket `dtg`) and SMTP (Gmail, port 587 STARTTLS) are configured and verified end-to-end via `scripts/verify-r2.ts` (S3 round-trip + public `r2.dev` delivery) and `scripts/verify-smtp.ts` (auth + one labelled test email). Flutterwave and the external alert channel remain the open seams.

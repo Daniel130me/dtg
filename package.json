@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "prisma generate && next build",
-    "start": "node --env-file-if-exists=.env .next/standalone/server.js",
+    "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/**/*.test.ts",
@@ -19,7 +19,13 @@
     "db:migrate:test": "prisma migrate deploy --config prisma.test.config.ts",
     "db:migrate:status": "prisma migrate status",
     "db:seed": "prisma db seed",
-    "owner:bootstrap": "tsx scripts/bootstrap-owner.ts"
+    "owner:bootstrap": "tsx scripts/bootstrap-owner.ts",
+    "jobs:outbox": "tsx scripts/dispatch-outbox.ts",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "engines": {
+    "node": ">=24.14.1 <25",
+    "npm": ">=11 <12"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1123.0",

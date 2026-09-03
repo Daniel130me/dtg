@@ -2,8 +2,8 @@
  * Production smoke test / post-deployment verification.
  *
  * Usage:
- *   bunx tsx scripts/smoke.ts [baseUrl]
- *   APP_URL=https://dtg.example bunx tsx scripts/smoke.ts
+ *   npm run smoke -- [baseUrl]
+ *   APP_URL=https://dtg.example npm run smoke
  *
  * Cookie-free, read-only, idempotent: safe to run against production right
  * after a deploy or a restore (docs/RECOVERY_RUNBOOK.md step 4.1.6). Exit code

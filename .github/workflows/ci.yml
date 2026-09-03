@@ -1,9 +1,14 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -28,16 +33,17 @@ jobs:
           --health-retries 10
     env:
       NODE_ENV: test
+      NEXT_TELEMETRY_DISABLED: 1
       DATABASE_URL: postgresql://dtg:dtg_test_password@localhost:5432/dtg_test
       DIRECT_URL: postgresql://dtg:dtg_test_password@localhost:5432/dtg_test
       TEST_DATABASE_URL: postgresql://dtg:dtg_test_password@localhost:5432/dtg_test
       APP_URL: http://localhost:3000
       RATE_LIMIT_SALT: ci-only-rate-limit-salt-value
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npm run db:generate

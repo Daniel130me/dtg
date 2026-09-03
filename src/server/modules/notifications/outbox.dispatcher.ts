@@ -37,10 +37,9 @@ import { purgeExpiredContactBodies } from "@/server/modules/support/contact.serv
 // completed event is never reprocessed — the acceptable residual risk is a
 // lost email, never a duplicate send storm.
 //
-// Concurrency: the claim is a simple guarded updateMany (status PENDING ->
-// PROCESSING). This is a non-locking, single-process claim by design; if the
-// process dies mid-event the row stays PROCESSING and needs a manual reset,
-// which is the documented trade-off for this deployment stage.
+// Concurrency: the claim is a guarded updateMany (status PENDING ->
+// PROCESSING) with an expiry timestamp. A future sweep recovers an abandoned
+// lease if a worker exits mid-event, so events cannot remain stuck forever.
 //
 // Retry policy: retryable errors go back to PENDING with exponential backoff
 // (outboxBackoffMs). Permanent email errors (EmailDeliveryError with
@@ -68,6 +67,7 @@ export const MAX_OUTBOX_ATTEMPTS = 5;
 const DEFAULT_DISPATCH_LIMIT = 20;
 const BACKOFF_BASE_MS = 30_000;
 const BACKOFF_MAX_MS = 15 * 60_000;
+const PROCESSING_LEASE_MS = 10 * 60_000;
 
 export interface DispatchResult {
   processed: number;
@@ -740,8 +740,25 @@ async function runOutboxDispatchSweep(options: { limit?: number } = {}): Promise
     logger.warn("Contact retention sweep failed during outbox dispatch", { error });
   }
 
+  const now = new Date();
+  const recovered = await db.outboxEvent.updateMany({
+    where: {
+      status: OutboxStatus.PROCESSING,
+      availableAt: { lte: now },
+    },
+    data: {
+      status: OutboxStatus.PENDING,
+      attempts: { increment: 1 },
+      availableAt: now,
+      lastError: "Recovered after the processing lease expired.",
+    },
+  });
+  if (recovered.count > 0) {
+    logger.warn("Recovered abandoned outbox processing leases", { count: recovered.count });
+  }
+
   const events = await db.outboxEvent.findMany({
-    where: { status: OutboxStatus.PENDING, availableAt: { lte: new Date() } },
+    where: { status: OutboxStatus.PENDING, availableAt: { lte: now } },
     orderBy: [{ availableAt: "asc" }, { id: "asc" }],
     take: limit,
     select: {
@@ -756,11 +773,12 @@ async function runOutboxDispatchSweep(options: { limit?: number } = {}): Promise
   });
 
   for (const event of events) {
-    // Non-locking claim: only a PENDING row flips to PROCESSING; a lost claim
-    // simply means another worker took it.
+    // The future availableAt value doubles as the processing-lease expiry and
+    // uses the existing (status, availableAt, id) index for cheap recovery.
+    const leaseExpiresAt = new Date(Date.now() + PROCESSING_LEASE_MS);
     const claimed = await db.outboxEvent.updateMany({
       where: { id: event.id, status: OutboxStatus.PENDING },
-      data: { status: OutboxStatus.PROCESSING },
+      data: { status: OutboxStatus.PROCESSING, availableAt: leaseExpiresAt },
     });
     if (claimed.count === 0) continue;
     result.processed += 1;
